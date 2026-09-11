@@ -1,4 +1,4 @@
-import { isPhoneVerified, consumePhoneVerification } from '../services/otpService.js';
+// OTP Verification bypassed for seamless onboarding
 import { Request, Response } from 'express';
 import { 
   db, 
@@ -7,7 +7,9 @@ import {
   updateDbtPaymentStatus, 
   dbtPaymentStatus, 
   dbtUtrNumber,
-  activeFarmerId 
+  activeFarmerId,
+  syncQueueWithFarmer,
+  operatorQueueList
 } from '../db.js';
 import { AuthUser } from '../../src/types.js';
 
@@ -27,6 +29,12 @@ export const updateFarmerProfile = async (req: Request, res: Response) => {
     const farmer = await getActiveFarmer();
     if (farmer) {
       const updated = await db.farmers.updateOne(farmer.id, req.body);
+      const slot = (await db.slots.findById('slot_' + farmer.id)) || (await db.slots.findOne());
+      try {
+        syncQueueWithFarmer(updated, slot);
+      } catch (err) {
+        console.error('Profile queue sync error:', err);
+      }
       return res.json(updated);
     }
     res.status(404).json({ error: 'Farmer profile not found' });
@@ -59,16 +67,8 @@ export const getFarmerPayments = async (req: Request, res: Response) => {
 export const registerFarmer = async (req: Request, res: Response) => {
   try {
     const phone = req.body.phone;
-    // Enforce strict backend phone OTP verification
-    if (!isPhoneVerified(phone)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Mobile number has not been verified via OTP. Please verify the OTP sent to your phone first.'
-      });
-    }
-
+    // Direct registration without OTP requirement
     const result = await registerFarmerData(req.body);
-    consumePhoneVerification(phone);
     const authUser: AuthUser = {
       id: result.farmer.id,
       name: `${result.farmer.nameHi} (${result.farmer.nameEn || result.farmer.nameHi})`,
@@ -119,6 +119,13 @@ export const loginFarmer = async (req: Request, res: Response) => {
       phoneOrEmail: farmerToUse.phone,
       stationOrCenter: slot ? `${slot.mandiCenterName} (${slot.gateNumber})` : 'सांवेर उपार्जन केंद्र (गेट #02)'
     };
+
+    // Real-time synchronization with Mandi Operator Yard Queue
+    try {
+      syncQueueWithFarmer(farmerToUse, slot);
+    } catch (qErr) {
+      console.error('Queue sync error on login:', qErr);
+    }
 
     res.json({
       success: true,

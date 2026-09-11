@@ -516,8 +516,12 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                 {filteredQueue.map((item, idx) => (
                   <tr
                     key={item.token}
-                    className={`hover:bg-[#f4f9f5] transition-colors ${
-                      idx === 0 ? 'bg-[#fcfefa] border-l-4 border-l-[#1b7e45]' : ''
+                    onClick={() => setSearchToken(item.token)}
+                    title={isHi ? 'इस किसान का विवरण देखने के लिए क्लिक करें' : 'Click to select farmer for verification'}
+                    className={`hover:bg-[#eef8f2] transition-colors cursor-pointer ${
+                      (searchToken && (item.token === searchToken || item.token.includes(searchToken.replace('#', '')))) || (!searchToken && idx === 0)
+                        ? 'bg-[#eef8f2] border-l-4 border-l-[#1b7e45] shadow-2xs font-medium'
+                        : ''
                     }`}
                   >
                     <td className="p-3 font-mono font-bold text-[#854d0e]">

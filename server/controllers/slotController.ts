@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { db, getActiveSlot as getActiveSlotFromDb } from '../db.js';
+import { db, getActiveFarmer, getActiveSlot as getActiveSlotFromDb, syncQueueWithFarmer } from '../db.js';
 import { sendNotification } from '../services/notificationService.js';
 
 // AI Auto-Reschedule Predictions Engine
@@ -117,6 +117,22 @@ export const bookSlot = async (req: Request, res: Response) => {
       );
     }
 
+    // Real-time synchronization with Mandi Operator Yard Queue
+    try {
+      const currentFarmer = (await db.farmers.findById(newSlot.farmerId)) || (await getActiveFarmer());
+      if (currentFarmer) {
+        syncQueueWithFarmer(currentFarmer, newSlot, {
+          stage: 'गेट आगमन प्रतीक्षारत',
+          stageType: 'gate_wait',
+          currentScale: 'तौल कांटा क्र. 02',
+          actionType: 'gate_call',
+          actionLabel: 'गेट बुलावा भेजें'
+        });
+      }
+    } catch (e) {
+      console.error('Queue sync on bookSlot error:', e);
+    }
+
     res.json({ success: true, slot: newSlot });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -148,6 +164,20 @@ export const rescheduleSlot = async (req: Request, res: Response) => {
           title: 'स्लॉट री-शेड्यूल पुष्टि',
           type: 'both'
         });
+      }
+
+      // Real-time synchronization with Mandi Operator Yard Queue
+      try {
+        const currentFarmer = (await db.farmers.findById(updated.farmerId)) || (await getActiveFarmer());
+        if (currentFarmer) {
+          syncQueueWithFarmer(currentFarmer, updated, {
+            arrivalTime: updated.timeSlot,
+            mandiName: updated.mandiCenterName,
+            stage: isAiSuggested ? 'स्मार्ट री-शेड्यूल (गेट प्रतीक्षारत)' : 'री-शेड्यूल स्लॉट (गेट प्रतीक्षारत)'
+          });
+        }
+      } catch (e) {
+        console.error('Queue sync on rescheduleSlot error:', e);
       }
 
       return res.json({ success: true, slot: updated, isAiSuggested });

@@ -463,7 +463,177 @@ export interface AppNotification {
   timestamp: string;
 }
 
-export let operatorQueueList: FarmerQueueItem[] = [];
+export const initialQueueItems: FarmerQueueItem[] = [
+  {
+    id: 'q_farmer_001',
+    farmerId: 'farmer_001',
+    token: '#MP-2409',
+    farmerName: 'राम सिंह (Ram Singh)',
+    phone: '9826100001',
+    vehicleNo: 'MP-09-GE-4102',
+    crop: 'गेहूँ शरबती (45 Qt)',
+    quantity: 45,
+    mandiName: 'सांवेर उपार्जन केंद्र (गेट #02)',
+    arrivalTime: '10:45 AM',
+    stage: 'गेट प्रवेश स्वीकृत (लैब प्रतीक्षारत)',
+    stageType: 'quality',
+    currentScale: 'तौल कांटा क्र. 02',
+    actionType: 'call_scale',
+    actionLabel: 'कांटा #02 बुलावा भेजें',
+  },
+  {
+    id: 'q_mp_88210',
+    farmerId: 'MP-88210',
+    token: '#MP-88210',
+    farmerName: 'रमेश पटेल (Ramesh Patel)',
+    phone: '9826199999',
+    vehicleNo: 'MP-09-EA-5542',
+    crop: 'सोयाबीन (55 Qt)',
+    quantity: 55,
+    mandiName: 'सांवेर उपार्जन केंद्र',
+    arrivalTime: '11:00 AM',
+    stage: 'गेट आगमन प्रतीक्षारत',
+    stageType: 'gate_wait',
+    currentScale: 'तौल कांटा क्र. 01',
+    actionType: 'gate_call',
+    actionLabel: 'गेट बुलावा भेजें',
+  },
+  {
+    id: 'q_mp_5120',
+    farmerId: 'MP-5120',
+    token: '#MP-5120',
+    farmerName: 'मुकेश शर्मा (Mukesh Sharma)',
+    phone: '9893112233',
+    vehicleNo: 'MP-09-LA-5582',
+    crop: 'चना (30 Qt)',
+    quantity: 30,
+    mandiName: 'सांवेर उपार्जन केंद्र',
+    arrivalTime: '09:30 AM',
+    stage: 'इलेक्ट्रॉनिक तौल प्रगति पर',
+    stageType: 'weighment',
+    currentScale: 'तौल कांटा क्र. 03',
+    actionType: 'record_weight',
+    actionLabel: 'वजन दर्ज करें',
+  },
+  {
+    id: 'q_mp_4402',
+    farmerId: 'MP-4402',
+    token: '#MP-4402',
+    farmerName: 'सुरेश पटेल (Suresh Patel)',
+    phone: '9425012345',
+    vehicleNo: 'MP-11-AB-9088',
+    crop: 'गेहूँ (60 Qt)',
+    quantity: 60,
+    mandiName: 'हातोद उपार्जन केंद्र',
+    arrivalTime: '09:00 AM',
+    stage: 'MSP ई-उपार्जन पर्ची तैयार',
+    stageType: 'ready',
+    currentScale: 'तौल कांटा क्र. 02',
+    actionType: 'slip_recommend',
+    actionLabel: 'MSP रसीद जारी करें',
+  }
+];
+
+export let operatorQueueList: FarmerQueueItem[] = [...initialQueueItems];
+
+export function syncQueueWithFarmer(farmer: any, slot?: any, extra?: Partial<FarmerQueueItem>) {
+  if (!farmer) return;
+  const rawToken = slot?.tokenNumber || farmer.id;
+  const token = String(rawToken).startsWith('#') ? String(rawToken) : `#${rawToken}`;
+
+  const existingIdx = operatorQueueList.findIndex(
+    it => it.farmerId === farmer.id || it.token === token || (farmer.phone && it.phone === farmer.phone)
+  );
+  const timeStr = new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' });
+
+  const updatedItem: FarmerQueueItem = {
+    id: existingIdx >= 0 ? operatorQueueList[existingIdx].id : 'q_' + farmer.id,
+    farmerId: farmer.id,
+    token,
+    farmerName: farmer.nameHi || farmer.nameEn || 'किसान भाई',
+    phone: farmer.phone || '9826199999',
+    vehicleNo: slot?.vehicleNumber || (existingIdx >= 0 ? operatorQueueList[existingIdx].vehicleNo : 'MP-09-EA-5542'),
+    crop: slot ? `${slot.cropName} (${slot.quantityQuintal} Qt)` : (farmer.registeredCrop || 'गेहूँ (45 Qt)'),
+    quantity: slot?.quantityQuintal || farmer.registeredQuantityLimit || 45,
+    mandiName: slot?.mandiCenterName || (existingIdx >= 0 ? operatorQueueList[existingIdx].mandiName : 'सांवेर उपार्जन केंद्र'),
+    arrivalTime: slot?.timeSlot || (existingIdx >= 0 ? operatorQueueList[existingIdx].arrivalTime : timeStr),
+    stage: existingIdx >= 0 ? operatorQueueList[existingIdx].stage : 'गेट आगमन प्रतीक्षारत',
+    stageType: existingIdx >= 0 ? operatorQueueList[existingIdx].stageType : 'gate_wait',
+    currentScale: existingIdx >= 0 ? operatorQueueList[existingIdx].currentScale : 'तौल कांटा क्र. 02',
+    actionType: existingIdx >= 0 ? operatorQueueList[existingIdx].actionType : 'gate_call',
+    actionLabel: existingIdx >= 0 ? operatorQueueList[existingIdx].actionLabel : 'गेट बुलावा भेजें',
+    ...extra
+  };
+
+  if (existingIdx >= 0) {
+    operatorQueueList[existingIdx] = updatedItem;
+  } else {
+    operatorQueueList.unshift(updatedItem);
+  }
+  return updatedItem;
+}
+
+export function syncQueueStageUpdate(stepNumber: number, status: 'completed' | 'in_progress' | 'upcoming', extra?: { subHi?: string; subEn?: string; details?: string }) {
+  const activeItem = operatorQueueList.find(it => it.farmerId === activeFarmerId) || operatorQueueList[0];
+  if (!activeItem) return;
+
+  if (stepNumber === 3) {
+    if (status === 'completed') {
+      activeItem.stage = 'गेट प्रवेश स्वीकृत (लैब प्रतीक्षारत)';
+      activeItem.stageType = 'quality';
+      activeItem.actionType = 'call_scale';
+      activeItem.actionLabel = 'कांटा #02 बुलावा भेजें';
+    } else if (status === 'in_progress') {
+      activeItem.stage = 'गेट पर आगमन (सत्यापन जारी)';
+      activeItem.stageType = 'gate_wait';
+      activeItem.actionType = 'gate_call';
+      activeItem.actionLabel = 'गेट बुलावा भेजें';
+    }
+  } else if (stepNumber === 4) {
+    if (status === 'completed') {
+      activeItem.stage = 'गुणवत्ता पास (तौल हेतु तैयार)';
+      activeItem.stageType = 'weighment';
+      activeItem.actionType = 'record_weight';
+      activeItem.actionLabel = 'वजन दर्ज करें';
+    } else if (status === 'in_progress') {
+      activeItem.stage = 'गुणवत्ता व नमी परीक्षण प्रगति पर';
+      activeItem.stageType = 'quality';
+      activeItem.actionType = 'call_scale';
+      activeItem.actionLabel = 'कांटा बुलावा भेजें';
+    }
+  } else if (stepNumber === 5) {
+    if (status === 'completed') {
+      activeItem.stage = 'तौल पूर्ण (ई-पर्ची जनरेटेड)';
+      activeItem.stageType = 'ready';
+      activeItem.actionType = 'slip_recommend';
+      activeItem.actionLabel = 'MSP पर्ची जारी करें';
+    } else if (status === 'in_progress') {
+      activeItem.stage = 'कांटा #02 पर वजन माप जारी';
+      activeItem.stageType = 'weighment';
+      activeItem.actionType = 'record_weight';
+      activeItem.actionLabel = 'वजन दर्ज करें';
+    }
+  } else if (stepNumber === 6) {
+    if (status === 'completed') {
+      activeItem.stage = 'MSP ई-उपार्जन पर्ची तैयार';
+      activeItem.stageType = 'ready';
+      activeItem.actionType = 'slip_recommend';
+      activeItem.actionLabel = 'DBT भुगतान जारी करें';
+    }
+  } else if (stepNumber === 7) {
+    if (status === 'completed') {
+      activeItem.stage = 'DBT भुगतान सफल (क्रेडिट सम्पन्न)';
+      activeItem.stageType = 'ready';
+      activeItem.actionType = 'completed';
+      activeItem.actionLabel = '✓ प्रक्रिया पूर्ण';
+    } else if (status === 'in_progress') {
+      activeItem.stage = 'DBT भुगतान प्रक्रियाधीन';
+      activeItem.stageType = 'ready';
+      activeItem.actionType = 'completed';
+      activeItem.actionLabel = 'ट्रेजरी क्लियरेंस...';
+    }
+  }
+}
 export let latestDirective: YardDirective | null = null;
 export let notificationsLog: AppNotification[] = [];
 
@@ -743,7 +913,13 @@ export async function registerFarmerData(input: any) {
     actionType: 'gate_call',
     actionLabel: '🚪 गेट आगमन दर्ज',
   };
-  operatorQueueList = [queueItem, ...operatorQueueList.filter(it => it.farmerId !== farmer.id)];
+  syncQueueWithFarmer(farmer, slot, {
+    stage: 'गेट आगमन प्रतीक्षारत',
+    stageType: 'gate_wait',
+    currentScale: 'तौल कांटा क्र. 02',
+    actionType: 'gate_call',
+    actionLabel: 'गेट बुलावा भेजें'
+  });
 
   // Set initial Live Directive for the farmer dashboard
   latestDirective = {
@@ -1034,12 +1210,26 @@ export async function updateStageStatus(stepNumber: number, status: 'completed' 
     }
   }
 
+  syncQueueStageUpdate(stepNumber, status, extra);
   return await db.stages.find();
 }
 
 export async function updateDbtPaymentStatus(status: 'pending' | 'in_progress' | 'credit_successful', utr?: string) {
   dbtPaymentStatus = status;
   const timeStr = new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' });
+
+  const activeQueueItem = operatorQueueList.find(it => it.farmerId === activeFarmerId) || operatorQueueList[0];
+  if (activeQueueItem) {
+    if (status === 'credit_successful') {
+      activeQueueItem.stage = 'DBT भुगतान सफल (क्रेडिट सम्पन्न)';
+      activeQueueItem.stageType = 'ready';
+      activeQueueItem.actionType = 'completed';
+      activeQueueItem.actionLabel = '✓ भुगतान सफल';
+    } else if (status === 'in_progress') {
+      activeQueueItem.stage = 'DBT भुगतान प्रक्रियाधीन';
+      activeQueueItem.stageType = 'ready';
+    }
+  }
 
   if (status === 'credit_successful') {
     dbtUtrNumber = utr || 'SBIN' + Math.floor(100000000 + Math.random() * 900000000);
