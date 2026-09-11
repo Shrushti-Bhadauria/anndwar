@@ -766,8 +766,8 @@ export async function registerFarmerData(input: any) {
     phone: farmer.phone,
     type: 'whatsapp',
     sender: 'AnnDwar - Kisan se Desh Tak',
-    title: '🌾 AnnDwar: स्लॉट बुकिंग पुष्टि',
-    message: `नमस्ते ${farmer.nameHi}, आपका उपार्जन स्लॉट टोकन #${tokenNumber} (${slot.cropName}, ${qty} क्विंटल) हेतु ${slot.mandiCenterName} में ${slot.date} (${slot.timeSlot}) के लिए सफलतापूर्वक पुष्ट हो गया है। गेट क्र. 02 पर QR पास दिखाएं। - AnnDwar: Kisan se Desh Tak`,
+    title: '🌾 AnnDwar स्लॉट पंजीकरण पुष्टि',
+    message: `🌾 AnnDwar - किसान से देश तक: नमस्ते ${farmer.nameHi}, आपका उपार्जन स्लॉट सफलतापूर्वक बुक हो गया है! टोकन #${tokenNumber}, मंडी केंद्र: ${slot.mandiCenterName}, समय: ${slot.timeSlot}, वाहन: ${slot.vehicleNumber}।`,
     timestamp: timeStr
   };
 
@@ -778,8 +778,8 @@ export async function registerFarmerData(input: any) {
     phone: farmer.phone,
     type: 'sms',
     sender: 'VM-ANNDWR',
-    title: 'SMS अलर्ट: AnnDwar स्लॉट टोकन',
-    message: `VM-ANNDWR: प्रिय ${farmer.nameHi}, AnnDwar में टोकन #${tokenNumber} जारी हुआ। केंद्र: ${slot.mandiCenterName}, समय: ${slot.timeSlot}, वाहन: ${slot.vehicleNumber}। - AnnDwar (किसान से देश तक)`,
+    title: 'SMS: AnnDwar टोकन पुष्टि',
+    message: `VM-ANNDWR: AnnDwar - किसान ${farmer.nameHi}, आपका टोकन #${tokenNumber} जारी हुआ। केंद्र: ${slot.mandiCenterName}, समय: ${slot.timeSlot}। - AnnDwar`,
     timestamp: timeStr
   };
 

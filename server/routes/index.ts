@@ -1,3 +1,4 @@
+import authRoutes from './authRoutes.js';
 import { Router } from 'express';
 import farmerRoutes from './farmerRoutes.js';
 import slotRoutes from './slotRoutes.js';
@@ -17,6 +18,7 @@ router.get('/health', (req, res) => {
 });
 
 // Modular Routes
+router.use('/auth', authRoutes);
 router.use('/farmer', farmerRoutes);
 router.use('/slots', slotRoutes);
 router.use('/queue', queueRoutes);

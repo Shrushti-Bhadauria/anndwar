@@ -57,6 +57,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+
+
   // New Registration Form State (Dynamic Data Collection)
   const [regFarmerId, setRegFarmerId] = useState('MP-88210');
   const [regNameEn, setRegNameEn] = useState('Ramesh Patel');
@@ -69,16 +71,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [regDistrict, setRegDistrict] = useState('इन्दौर (मध्य प्रदेश)');
   const [regLandAcres, setRegLandAcres] = useState<number>(6.5);
 
-  // Live OTP Verification
-  const [generatedOtp, setGeneratedOtp] = useState('489210');
+  // Live OTP Verification (Connected strictly to backend)
   const [enteredOtp, setEnteredOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [otpError, setOtpError] = useState('');
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [activeSmsToast, setActiveSmsToast] = useState<string | null>(null);
   const [otpBanner, setOtpBanner] = useState('');
 
-  // Dedicated Step 2: Slot Selection & Document Uploads
+  // Cooldown countdown timer for resend OTP
+  React.useEffect(() => {
+    let timer: any;
+    if (cooldownSeconds > 0) {
+      timer = setInterval(() => {
+        setCooldownSeconds((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
+
   const [regCrop, setRegCrop] = useState('शरबती गेहूँ (ग्रेड-A)');
   const [regQuantity, setRegQuantity] = useState<number>(55);
   const [regMandi, setRegMandi] = useState('सांवेर उपार्जन केंद्र');
@@ -162,41 +176,74 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setRegNameHi(converted);
   };
 
-  // Trigger Real OTP Dispatch to Registered Number
-  const handleSendOtp = () => {
+  // Trigger Real OTP Dispatch to Registered Number (Backend API)
+  const handleSendOtp = async () => {
+    if (cooldownSeconds > 0) return;
     if (!regPhone || regPhone.trim().length < 10) {
       setErrorMessage(isHi ? 'कृपया पहले 10 अंकों का मान्य मोबाइल नंबर दर्ज करें।' : 'Please enter a valid 10-digit mobile number first.');
       return;
     }
-    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(randomCode);
-    setOtpSent(true);
-    setIsOtpVerified(false);
-    setEnteredOtp('');
-    setOtpError('');
-    setErrorMessage('');
 
-    const smsMsg = isHi
-      ? `💬 [SMS प्राप्त +91 ${regPhone}]: AnnDwar किसान पंजीकरण OTP: ${randomCode} है। यह 10 मिनट के लिए मान्य है। किसी से साझा न करें।`
-      : `💬 [SMS to +91 ${regPhone}]: Your AnnDwar registration OTP is ${randomCode}. Valid for 10 minutes.`;
-    setActiveSmsToast(smsMsg);
-    setOtpBanner(isHi ? `✅ OTP +91 ${regPhone} पर भेजा गया: ${randomCode}` : `✅ OTP sent to +91 ${regPhone}: ${randomCode}`);
+    setIsSendingOtp(true);
+    setErrorMessage('');
+    setOtpError('');
+
+    try {
+      const res = await fetch('/api/auth/send-registration-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: regPhone.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpSent(true);
+        setIsOtpVerified(false);
+        setCooldownSeconds(data.cooldownSeconds || 60);
+        setOtpBanner(data.message || (isHi ? 'सत्यापन OTP आपके मोबाइल पर भेजा गया है।' : 'Verification OTP sent to your phone.'));
+      } else {
+        setErrorMessage(data.error || (isHi ? 'OTP भेजने में विफल।' : 'Failed to dispatch OTP'));
+        if (data.cooldownSeconds) setCooldownSeconds(data.cooldownSeconds);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Network failure while sending OTP.');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
-  const handleVerifyOtp = (): boolean => {
-    if (!enteredOtp || enteredOtp.trim().length === 0) {
-      setOtpError(isHi ? 'कृपया मोबाइल पर प्राप्त 6-अंकों का OTP दर्ज करें।' : 'Please enter the 6-digit OTP sent to your phone.');
+  const handleVerifyOtp = async (): Promise<boolean> => {
+    if (!enteredOtp || enteredOtp.trim().length !== 6) {
+      setOtpError(isHi ? 'कृपया 6-अंकों का पूरा OTP दर्ज करें।' : 'Please enter the complete 6-digit OTP.');
       setIsOtpVerified(false);
       return false;
     }
-    if (enteredOtp.trim() !== generatedOtp) {
-      setOtpError(isHi ? '❌ गलत ओटीपी! कृपया पंजीकृत मोबाइल पर भेजा गया सही 6-अंकों का OTP दर्ज करें।' : '❌ Invalid OTP! Please enter the correct 6-digit OTP sent to your registered number.');
-      setIsOtpVerified(false);
-      return false;
-    }
-    setIsOtpVerified(true);
+
+    setIsVerifyingOtp(true);
     setOtpError('');
-    return true;
+
+    try {
+      const res = await fetch('/api/auth/verify-registration-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: regPhone.trim(), otp: enteredOtp.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsOtpVerified(true);
+        setOtpError('');
+        return true;
+      } else {
+        setOtpError(data.error || (isHi ? 'गलत ओटीपी! पुनः प्रयास करें।' : 'Invalid OTP!'));
+        setIsOtpVerified(false);
+        return false;
+      }
+    } catch (err: any) {
+      setOtpError(err.message || 'Verification network error.');
+      setIsOtpVerified(false);
+      return false;
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   // Handle Existing Login
@@ -256,7 +303,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         setErrorMessage(isHi ? 'कृपया पहले "OTP भेजें" पर क्लिक करके मोबाइल नंबर सत्यापित करें।' : 'Please click "Send OTP" and verify your phone number first.');
         return;
       }
-      const ok = handleVerifyOtp();
+      const ok = await handleVerifyOtp();
       if (!ok) {
         setErrorMessage(isHi ? 'गलत ओटीपी! कृपया सही ओटीपी दर्ज करके सत्यापित करें।' : 'Invalid OTP! Please enter correct OTP and verify.');
         return;
@@ -586,10 +633,17 @@ export const LoginView: React.FC<LoginViewProps> = ({
                         />
                         <button
                           type="button"
+                          disabled={isSendingOtp || cooldownSeconds > 0 || isOtpVerified}
                           onClick={handleSendOtp}
-                          className="px-3 py-2 bg-[#2d6f52] hover:bg-[#235841] text-white text-[11px] font-bold rounded-xl shadow-xs transition-all cursor-pointer flex-shrink-0"
+                          className="px-3 py-2 bg-[#2d6f52] hover:bg-[#235841] disabled:opacity-60 text-white text-[11px] font-bold rounded-xl shadow-xs transition-all cursor-pointer flex-shrink-0"
                         >
-                          {isOtpVerified ? (isHi ? '✓ सत्यापित' : '✓ Verified') : (isHi ? 'OTP भेजें' : 'Send OTP')}
+                          {isOtpVerified 
+                            ? (isHi ? '✓ सत्यापित' : '✓ Verified') 
+                            : isSendingOtp 
+                            ? (isHi ? 'भेज रहे...' : 'Sending...') 
+                            : cooldownSeconds > 0 
+                            ? `${cooldownSeconds}s` 
+                            : (isHi ? 'OTP भेजें' : 'Send OTP')}
                         </button>
                       </div>
                     </div>
@@ -605,9 +659,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
                           <button
                             type="button"
                             onClick={handleSendOtp}
-                            className="text-[11px] text-[#1b7e45] font-bold hover:underline cursor-pointer"
+                            disabled={cooldownSeconds > 0 || isSendingOtp}
+                            className="text-[11px] text-[#1b7e45] font-bold hover:underline cursor-pointer disabled:opacity-50"
                           >
-                            {isHi ? 'पुनः भेजें' : 'Resend OTP'}
+                            {cooldownSeconds > 0 ? `${isHi ? 'पुनः भेजें' : 'Resend in'} (${cooldownSeconds}s)` : (isHi ? 'पुनः भेजें' : 'Resend OTP')}
                           </button>
                         </div>
 
@@ -634,19 +689,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
                         </div>
 
                         {/* Quick fill shortcut for testing */}
-                        <div className="flex items-center justify-between text-[11px] text-[#426a54]">
-                          <span>{isHi ? `सिम्युलेटेड SMS कोड: ${generatedOtp}` : `Simulated SMS code: ${generatedOtp}`}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEnteredOtp(generatedOtp);
-                              setOtpError('');
-                            }}
-                            className="text-[#1b7e45] font-bold hover:underline cursor-pointer"
-                          >
-                            {isHi ? 'कोड भरें (Auto-Fill)' : 'Auto-Fill'}
-                          </button>
-                        </div>
+                        <p className="text-[10.5px] text-[#527a63]">
+    {isHi ? '🔒 सुरक्षा निर्देश: OTP केवल आपके दिए गए पंजीकृत मोबाइल पर ही भेजा जाता है।' : '🔒 Security Note: OTP is dispatched only to your registered mobile number.'}
+  </p>
 
                         {otpError && (
                           <p className="text-xs text-red-600 font-bold flex items-center gap-1 bg-red-50 p-2 rounded-lg border border-red-200">

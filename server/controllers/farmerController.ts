@@ -1,3 +1,4 @@
+import { isPhoneVerified, consumePhoneVerification } from '../services/otpService.js';
 import { Request, Response } from 'express';
 import { 
   db, 
@@ -57,7 +58,17 @@ export const getFarmerPayments = async (req: Request, res: Response) => {
 // Register a new farmer with all details (no hardcoded fixed values)
 export const registerFarmer = async (req: Request, res: Response) => {
   try {
+    const phone = req.body.phone;
+    // Enforce strict backend phone OTP verification
+    if (!isPhoneVerified(phone)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mobile number has not been verified via OTP. Please verify the OTP sent to your phone first.'
+      });
+    }
+
     const result = await registerFarmerData(req.body);
+    consumePhoneVerification(phone);
     const authUser: AuthUser = {
       id: result.farmer.id,
       name: `${result.farmer.nameHi} (${result.farmer.nameEn || result.farmer.nameHi})`,
