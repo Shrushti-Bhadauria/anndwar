@@ -34,7 +34,7 @@ export async function dispatchRealNotification(phone: string, message: string, t
   console.log(`\n======================================================`);
   console.log(`📲 [REAL NOTIFICATION DISPATCH]`);
   console.log(`📞 Recipient: +91 ${tenDigit}`);
-  console.log(`🏷️ Header: ${title || 'AnnaDwar - Kisan se Desh Tak'}`);
+  console.log(`🏷️ Header: ${title || 'AnnDwar - Kisan se Desh Tak'}`);
   console.log(`💬 Content: ${message}`);
   console.log(`🔗 Universal WhatsApp Link: ${waUrl}`);
   console.log(`======================================================\n`);

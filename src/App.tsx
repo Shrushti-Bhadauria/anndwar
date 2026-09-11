@@ -140,9 +140,11 @@ export default function App() {
         <KisanWhatsAppBot
           lang={lang}
           activeSlot={activeSlot}
+          farmer={farmer}
           onSlotBooked={handleLiveSlotUpdate}
           isOpen={isWhatsAppOpen}
           onClose={() => setIsWhatsAppOpen(false)}
+          onOpen={() => setIsWhatsAppOpen(true)}
         />
       </>
     );
@@ -324,9 +326,11 @@ export default function App() {
       <KisanWhatsAppBot
         lang={lang}
         activeSlot={activeSlot}
+        farmer={farmer}
         onSlotBooked={handleLiveSlotUpdate}
         isOpen={isWhatsAppOpen}
         onClose={() => setIsWhatsAppOpen(false)}
+        onOpen={() => setIsWhatsAppOpen(true)}
       />
     </div>
   );

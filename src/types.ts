@@ -122,6 +122,9 @@ export interface CropPreCheckResult {
   weatherAlertHi: string;
   weatherAlertEn: string;
   imageUrl?: string;
+  isValidCropImage?: boolean;
+  errorMessage?: string;
+  detectedCrop?: string;
 }
 
 export interface LogisticsConsolidation {

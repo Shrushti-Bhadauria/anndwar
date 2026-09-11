@@ -6,7 +6,8 @@ import {
   Clock, 
   Calendar, 
   ShieldCheck,
-  Building2
+  Sparkles,
+  CreditCard
 } from 'lucide-react';
 import { Language, FarmerProfile } from '../types';
 
@@ -27,6 +28,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   farmer,
   onOpenDocuments,
+  onOpenPayments,
 }) => {
   const isHi = lang === 'hi';
 
@@ -37,6 +39,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       labelEn: 'Main Farmer Portal',
       icon: LayoutDashboard,
       badge: null,
+    },
+    {
+      id: 'crop_check',
+      labelHi: '🌾 AI फसल पूर्व-जाँच',
+      labelEn: 'AI Pre-Crop Check',
+      icon: Sparkles,
+      badge: 'AI',
+      badgeColor: 'bg-[#e0f2fe] text-[#0369a1] border border-[#bae6fd]',
     },
     {
       id: 'live_queue',
@@ -54,8 +64,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: null,
     },
     {
+      id: 'payments',
+      labelHi: 'DBT भुगतान एवं MSP',
+      labelEn: 'DBT Payments & MSP',
+      icon: CreditCard,
+      badge: isHi ? 'खाता' : 'DBT',
+      badgeColor: 'bg-[#fef3c7] text-[#92400e] border border-[#fde68a]',
+    },
+    {
       id: 'documents',
-      labelHi: 'दस्तावेज व चेकलिस्ट',
+      labelHi: 'आवश्यक दस्तावेज',
       labelEn: 'Document Checklist',
       icon: ShieldCheck,
       badge: '4/4',
@@ -80,13 +98,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <CheckCircle className="w-3.5 h-3.5 text-[#1b7e45] fill-[#1b7e45]/20" />
             </div>
             <p className="text-[11px] text-[#5f7a6b] leading-tight font-mono">
-              {farmer?.id ? `ID: ${farmer.id}` : (isHi ? 'प्रमाणित किसान (सांवेर)' : 'Verified Farmer')}
+              {farmer?.id ? `ID: ${farmer.id}` : (isHi ? 'सत्यापित किसान (पंजीकृत)' : 'Verified Farmer')}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Nav Items (Clean 4 items strictly as requested) */}
+      {/* Nav Items */}
       <nav className="flex flex-col gap-1.5" aria-label="Sidebar Menu">
         {menuItems.map((item) => {
           const Icon = item.icon;
@@ -98,6 +116,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => {
                 if (item.action === 'open_docs') {
                   onOpenDocuments();
+                } else if (item.id === 'payments' && onOpenPayments) {
+                  onOpenPayments();
                 } else {
                   onSelectTab(item.id);
                 }
@@ -126,6 +146,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
       </nav>
+
+      {/* AnnDwar Farmer Support Banner */}
+      <div className="mt-auto bg-emerald-50/80 border border-emerald-200/70 rounded-xl p-3 text-xs text-emerald-900">
+        <p className="font-bold flex items-center gap-1.5 text-emerald-800">
+          <span>🌾 AnnDwar Sahayak</span>
+        </p>
+        <p className="text-[11px] text-emerald-700 mt-1 leading-relaxed">
+          {isHi ? 'सहायता या स्लॉट जानकारी के लिए नीचे दिए व्हाट्सएप सहायक बटन का उपयोग करें।' : 'For instant assistance, use the WhatsApp Sahayak button below.'}
+        </p>
+      </div>
     </aside>
   );
 };

@@ -765,9 +765,9 @@ export async function registerFarmerData(input: any) {
     farmerName: farmer.nameHi,
     phone: farmer.phone,
     type: 'whatsapp',
-    sender: 'AnnaDwar - Kisan se Desh Tak',
-    title: '🌾 AnnaDwar: स्लॉट बुकिंग पुष्टि',
-    message: `नमस्ते ${farmer.nameHi}, आपका उपार्जन स्लॉट टोकन #${tokenNumber} (${slot.cropName}, ${qty} क्विंटल) हेतु ${slot.mandiCenterName} में ${slot.date} (${slot.timeSlot}) के लिए सफलतापूर्वक पुष्ट हो गया है। गेट क्र. 02 पर QR पास दिखाएं। - AnnaDwar: Kisan se Desh Tak`,
+    sender: 'AnnDwar - Kisan se Desh Tak',
+    title: '🌾 AnnDwar: स्लॉट बुकिंग पुष्टि',
+    message: `नमस्ते ${farmer.nameHi}, आपका उपार्जन स्लॉट टोकन #${tokenNumber} (${slot.cropName}, ${qty} क्विंटल) हेतु ${slot.mandiCenterName} में ${slot.date} (${slot.timeSlot}) के लिए सफलतापूर्वक पुष्ट हो गया है। गेट क्र. 02 पर QR पास दिखाएं। - AnnDwar: Kisan se Desh Tak`,
     timestamp: timeStr
   };
 
@@ -778,8 +778,8 @@ export async function registerFarmerData(input: any) {
     phone: farmer.phone,
     type: 'sms',
     sender: 'VM-ANNDWR',
-    title: 'SMS अलर्ट: AnnaDwar स्लॉट टोकन',
-    message: `VM-ANNDWR: प्रिय ${farmer.nameHi}, AnnaDwar में टोकन #${tokenNumber} जारी हुआ। केंद्र: ${slot.mandiCenterName}, समय: ${slot.timeSlot}, वाहन: ${slot.vehicleNumber}। - AnnaDwar (किसान से देश तक)`,
+    title: 'SMS अलर्ट: AnnDwar स्लॉट टोकन',
+    message: `VM-ANNDWR: प्रिय ${farmer.nameHi}, AnnDwar में टोकन #${tokenNumber} जारी हुआ। केंद्र: ${slot.mandiCenterName}, समय: ${slot.timeSlot}, वाहन: ${slot.vehicleNumber}। - AnnDwar (किसान से देश तक)`,
     timestamp: timeStr
   };
 
@@ -834,9 +834,9 @@ export async function updateOperatorAction(token: string, actionType: string, cu
         farmerName,
         phone,
         type: 'whatsapp',
-        sender: 'AnnaDwar - Kisan se Desh Tak',
+        sender: 'AnnDwar - Kisan se Desh Tak',
         title: '🌾 गेट प्रवेश पुष्टि',
-        message: `🌾 AnnaDwar - Kisan se Desh Tak: नमस्ते ${farmerName}, आपका टोकन ${cleanToken} गेट क्र. 02 पर प्रविष्ट हो चुका है। कृपया वाहन को नमी परीक्षण काउंटर / लैब की ओर ले जाएं।`,
+        message: `🌾 AnnDwar - Kisan se Desh Tak: नमस्ते ${farmerName}, आपका टोकन ${cleanToken} गेट क्र. 02 पर प्रविष्ट हो चुका है। कृपया वाहन को नमी परीक्षण काउंटर / लैब की ओर ले जाएं।`,
         timestamp: timeStr
       },
       {
@@ -847,28 +847,28 @@ export async function updateOperatorAction(token: string, actionType: string, cu
         type: 'sms',
         sender: 'VM-ANNDWR',
         title: 'SMS: गेट प्रवेश सम्पन्न',
-        message: `VM-ANNDWR: AnnaDwar - टोकन ${cleanToken} गेट प्रवेश सम्पन्न। नमूना जांच हेतु वाहन लैब पर लाएं। - AnnaDwar (किसान से देश तक)`,
+        message: `VM-ANNDWR: AnnDwar - टोकन ${cleanToken} गेट प्रवेश सम्पन्न। नमूना जांच हेतु वाहन लैब पर लाएं। - AnnDwar (किसान से देश तक)`,
         timestamp: timeStr
       }
     );
-    dispatchRealNotification(phone, `🌾 AnnaDwar - Kisan se Desh Tak: नमस्ते ${farmerName}, आपका टोकन ${cleanToken} गेट क्र. 02 पर प्रविष्ट हो चुका है। कृपया वाहन को नमी परीक्षण काउंटर / लैब की ओर ले जाएं।`, '🌾 गेट प्रवेश पुष्टि').catch(console.error);
+    dispatchRealNotification(phone, `🌾 AnnDwar - Kisan se Desh Tak: नमस्ते ${farmerName}, आपका टोकन ${cleanToken} गेट क्र. 02 पर प्रविष्ट हो चुका है। कृपया वाहन को नमी परीक्षण काउंटर / लैब की ओर ले जाएं।`, '🌾 गेट प्रवेश पुष्टि').catch(console.error);
   } else if (actionType === 'call_scale') {
     if (item) {
-      item.stage = `✓ ${scale} पर आमंत्रित`;
+      item.stage = `✓ ${scale} पर बुलाया गया`;
       item.stageType = 'weighment';
       item.currentScale = scale;
       item.actionType = 'record_weight';
-      item.actionLabel = 'वजन रिकॉर्ड';
+      item.actionLabel = 'तौल दर्ज करें';
     }
     await updateStageStatus(4, 'completed', { subHi: 'नमी 11.2% (मानक पास ✓)' });
-    await updateStageStatus(5, 'in_progress', { subHi: `${scale} पर तौल चालू` });
+    await updateStageStatus(5, 'in_progress', { subHi: `${scale} पर तौल जारी` });
 
     latestDirective = {
       id: 'dir_' + Date.now(),
       farmerId: item?.farmerId || activeFarmerId,
       farmerName,
       token: cleanToken,
-      textHi: `🚨 तत्काल निर्देश: टोकन ${cleanToken} (${farmerName}) - कृपया तुरंत अपना वाहन ${scale} पर ले जाएं। तौल हेतु आपका नंबर आ गया है!`,
+      textHi: `तत्काल निर्देश: टोकन ${cleanToken} (${farmerName}) - कृपया अपना वाहन तुरंत ${scale} पर ले जाएं। तौल की बारी आ गई है!`,
       textEn: `Urgent Directive: Token ${cleanToken} (${farmerName}) - Please move your vehicle to ${scale} immediately. It is your turn for weighment!`,
       scaleNumber: scale,
       time: timeStr,
@@ -882,9 +882,9 @@ export async function updateOperatorAction(token: string, actionType: string, cu
         farmerName,
         phone,
         type: 'whatsapp',
-        sender: 'AnnaDwar - Kisan se Desh Tak',
-        title: '🚨 धर्मकांटा बुलावा अलर्ट',
-        message: `🚨 AnnaDwar - Kisan se Desh Tak: आवश्यक सूचना! ${farmerName}, आपका टोकन ${cleanToken} ${scale} पर आमंत्रित किया गया है। कृपया बिना विलंब अपना वाहन ${scale} पर लाएं।`,
+        sender: 'AnnDwar - Kisan se Desh Tak',
+        title: '📢 तौलकांटा बुलावा अलर्ट',
+        message: `📢 AnnDwar - किसान से देश तक: आवश्यक सूचना! ${farmerName}, आपका टोकन #${cleanToken} ${scale} पर बुलाया गया है। कृपया बिना विलंब वाहन ${scale} पर ले जाएं।`,
         timestamp: timeStr
       },
       {
@@ -894,28 +894,28 @@ export async function updateOperatorAction(token: string, actionType: string, cu
         phone,
         type: 'sms',
         sender: 'VM-ANNDWR',
-        title: 'SMS: धर्मकांटा बुलावा',
-        message: `VM-ANNDWR: AnnaDwar - टोकन ${cleanToken} ${scale} पर तुरंत पहुंचें। आपका तौल चालू हो रहा है। - AnnaDwar (किसान से देश तक)`,
+        title: 'SMS: तौलकांटा बुलावा',
+        message: `VM-ANNDWR: AnnDwar - टोकन #${cleanToken} को ${scale} पर तुरंत आमंत्रित किया गया है। वाहन तौलकांटे पर लाएं। - AnnDwar (किसान से देश तक)`,
         timestamp: timeStr
       }
     );
-    dispatchRealNotification(phone, `🚨 AnnaDwar - Kisan se Desh Tak: आवश्यक सूचना! ${farmerName}, आपका टोकन ${cleanToken} ${scale} पर आमंत्रित किया गया है। कृपया बिना विलंब अपना वाहन ${scale} पर लाएं।`, '🚨 धर्मकांटा बुलावा अलर्ट').catch(console.error);
+    dispatchRealNotification(phone, `📢 AnnDwar - किसान से देश तक: आवश्यक सूचना! ${farmerName}, आपका टोकन #${cleanToken} ${scale} पर बुलाया गया है। कृपया बिना विलंब वाहन ${scale} पर ले जाएं।`, '📢 तौलकांटा बुलावा अलर्ट').catch(console.error);
   } else if (actionType === 'record_weight') {
     if (item) {
-      item.stage = 'वेयरहाउस अनलोडिंग';
+      item.stage = 'अनलोडिंग व अंतिम सत्यापन';
       item.stageType = 'unloading';
       item.actionType = 'slip_recommend';
-      item.actionLabel = 'पर्ची संस्तुति';
+      item.actionLabel = 'पावती व DBT जारी करें';
     }
-    await updateStageStatus(5, 'completed', { subHi: 'शुद्ध तौल दर्ज ✓' });
-    await updateStageStatus(6, 'in_progress', { subHi: 'ई-पावती तैयार की जा रही है' });
+    await updateStageStatus(5, 'completed', { subHi: 'सकल तौल दर्ज ✓' });
+    await updateStageStatus(6, 'in_progress', { subHi: 'ई-उपार्जन पावती तैयार' });
 
     latestDirective = {
       id: 'dir_' + Date.now(),
       farmerId: item?.farmerId || activeFarmerId,
       farmerName,
       token: cleanToken,
-      textHi: `⚖️ तौल दर्ज: टोकन ${cleanToken} (${farmerName}) - सकल एवं शुद्ध वजन सफलतापूर्वक दर्ज हुआ! कृपया अनलोडिंग उपरांत पावती काउंटर पर संपर्क करें।`,
+      textHi: `तौल पूर्ण: टोकन ${cleanToken} (${farmerName}) - सकल भार 58.4 क्विंटल सत्यापित हुआ। अनलोडिंग के बाद पावती प्राप्त करें।`,
       textEn: `Weighment recorded for Token ${cleanToken} (${farmerName})! Gross and net weight verified.`,
       scaleNumber: scale,
       time: timeStr,
@@ -929,9 +929,9 @@ export async function updateOperatorAction(token: string, actionType: string, cu
         farmerName,
         phone,
         type: 'whatsapp',
-        sender: 'AnnaDwar - Kisan se Desh Tak',
-        title: '⚖️ तौल वजन दर्ज',
-        message: `🌾 AnnaDwar - Kisan se Desh Tak: ${farmerName}, आपके टोकन ${cleanToken} का शुद्ध वजन सफलतापूर्वक दर्ज कर लिया गया है। ई-उपार्जन पावती तैयार हो रही है।`,
+        sender: 'AnnDwar - Kisan se Desh Tak',
+        title: '⚖️ तौल सत्यापन रिपोर्ट',
+        message: `⚖️ AnnDwar - किसान से देश तक: ${farmerName}, टोकन #${cleanToken} का तौल कार्य पूर्ण हो गया है। ई-उपार्जन पावती तैयार की जा रही है।`,
         timestamp: timeStr
       },
       {
@@ -941,32 +941,32 @@ export async function updateOperatorAction(token: string, actionType: string, cu
         phone,
         type: 'sms',
         sender: 'VM-ANNDWR',
-        title: 'SMS: तौल वजन दर्ज',
-        message: `VM-ANNDWR: AnnaDwar - टोकन ${cleanToken} का वजन धर्मकांटा पर दर्ज हुआ। पावती जनरेट हो रही है। - AnnaDwar (किसान से देश तक)`,
+        title: 'SMS: तौल सत्यापन',
+        message: `VM-ANNDWR: AnnDwar - टोकन #${cleanToken} का तौल माप 58.4 क्विंटल दर्ज हुआ। - AnnDwar`,
         timestamp: timeStr
       }
     );
-    dispatchRealNotification(phone, `🌾 AnnaDwar - Kisan se Desh Tak: ${farmerName}, आपके टोकन ${cleanToken} का शुद्ध वजन सफलतापूर्वक दर्ज कर लिया गया है। ई-उपार्जन पावती तैयार हो रही है।`, '⚖️ तौल वजन दर्ज').catch(console.error);
+    dispatchRealNotification(phone, `⚖️ AnnDwar - किसान से देश तक: ${farmerName}, टोकन #${cleanToken} का तौल कार्य पूर्ण हो गया है।`, '⚖️ तौल सत्यापन रिपोर्ट').catch(console.error);
   } else if (actionType === 'slip_recommend') {
     if (item) {
-      item.stage = 'पावती जारी (Ready)';
+      item.stage = 'उपार्जन पूर्ण (Ready for DBT)';
       item.stageType = 'ready';
       item.actionType = 'completed';
       item.actionLabel = '✓ पूर्ण';
     }
-    await updateStageStatus(6, 'completed', { subHi: 'डिजिटल पावती निर्गत ✓' });
-    await updateStageStatus(7, 'in_progress', { subHi: 'ट्रेजरी व APB क्लीयरेंस' });
+    await updateStageStatus(6, 'completed', { subHi: 'पावती जारी ✓' });
+    await updateStageStatus(7, 'completed', { subHi: 'DBT भुगतान प्रेषित ₹1,09,125' });
 
     latestDirective = {
       id: 'dir_' + Date.now(),
       farmerId: item?.farmerId || activeFarmerId,
       farmerName,
       token: cleanToken,
-      textHi: `📜 पावती निर्गत: टोकन ${cleanToken} (${farmerName}) - डिजिटल पावती जारी हो चुकी है। DBT बैंक खाता अंतरण प्रक्रिया प्रारंभ कर दी गई है।`,
-      textEn: `Receipt issued for Token ${cleanToken} (${farmerName}). DBT Payment pipeline initiated.`,
-      scaleNumber: 'काउंटर #01',
+      textHi: `उपार्जन पूर्ण: टोकन ${cleanToken} (${farmerName}) - अनाज स्वीकृति व ई-पावती पूर्ण हो चुकी है। DBT द्वारा भुगतान बैंक में भेजा जा रहा है।`,
+      textEn: `Procurement Complete: Token ${cleanToken} (${farmerName}) - Grain accepted. DBT payout initiated.`,
+      scaleNumber: 'मुख्यालय',
       time: timeStr,
-      action: 'slip_issued'
+      action: 'slip_recommend'
     };
 
     notificationsLog.unshift(
@@ -976,9 +976,9 @@ export async function updateOperatorAction(token: string, actionType: string, cu
         farmerName,
         phone,
         type: 'whatsapp',
-        sender: 'AnnaDwar - Kisan se Desh Tak',
-        title: '📜 डिजिटल पावती निर्गत',
-        message: `📜 AnnaDwar - Kisan se Desh Tak: बधाई! ${farmerName}, आपकी आधिकारिक उपार्जन पावती पोर्टल पर उपलब्ध है। DBT बैंक भुगतान प्रक्रियाधीन है।`,
+        sender: 'AnnDwar - Kisan se Desh Tak',
+        title: '💰 उपार्जन स्वीकृति व DBT प्रेषण',
+        message: `🎉 AnnDwar - किसान से देश तक: बधाई ${farmerName}! आपका खाद्यान्न उपार्जन स्वीकार कर लिया गया है। उपार्जन राशि ₹1,09,125 DBT द्वारा सीधे आपके बैंक खाते में भेजी जा रही है।`,
         timestamp: timeStr
       },
       {
@@ -988,12 +988,12 @@ export async function updateOperatorAction(token: string, actionType: string, cu
         phone,
         type: 'sms',
         sender: 'VM-ANNDWR',
-        title: 'SMS: पावती जारी',
-        message: `VM-ANNDWR: AnnaDwar - टोकन ${cleanToken} की डिजिटल पावती जारी। DBT भुगतान 24-48 घंटे में सीधे बैंक खाते में पहुंचेगा। - AnnaDwar`,
+        title: 'SMS: DBT भुगतान',
+        message: `VM-ANNDWR: AnnDwar - टोकन #${cleanToken} उपार्जन स्वीकृत। राशि ₹1,09,125 DBT द्वारा बैंक खाता में प्रेषित। UTR: RBI2025091104821. - AnnDwar`,
         timestamp: timeStr
       }
     );
-    dispatchRealNotification(phone, `📜 AnnaDwar - Kisan se Desh Tak: बधाई! ${farmerName}, आपकी आधिकारिक उपार्जन पावती पोर्टल पर उपलब्ध है। DBT बैंक भुगतान प्रक्रियाधीन है।`, '📜 डिजिटल पावती निर्गत').catch(console.error);
+    dispatchRealNotification(phone, `🎉 AnnDwar - किसान से देश तक: बधाई ${farmerName}! आपका खाद्यान्न उपार्जन स्वीकार कर लिया गया है। उपार्जन राशि ₹1,09,125 DBT द्वारा आपके बैंक खाते में भेजी जा रही है।`, '💰 DBT भुगतान प्रेषण').catch(console.error);
   }
 
   return {
@@ -1067,9 +1067,9 @@ export async function updateDbtPaymentStatus(status: 'pending' | 'in_progress' |
         farmerName,
         phone,
         type: 'whatsapp',
-        sender: 'AnnaDwar - Kisan se Desh Tak',
+        sender: 'AnnDwar - Kisan se Desh Tak',
         title: '💰 DBT बैंक भुगतान सफल',
-        message: `💰 AnnaDwar - Kisan se Desh Tak: शुभ समाचार! ${farmerName}, आपके आधार लिंक्ड बैंक खाते में MSP उपार्जन राशि DBT द्वारा अंतरित कर दी गई है (UTR: ${dbtUtrNumber})। - AnnaDwar: किसान से देश तक`,
+        message: `💰 AnnDwar - Kisan se Desh Tak: शुभ समाचार! ${farmerName}, आपके आधार लिंक्ड बैंक खाते में MSP उपार्जन राशि DBT द्वारा अंतरित कर दी गई है (UTR: ${dbtUtrNumber})। - AnnDwar: किसान से देश तक`,
         timestamp: timeStr
       },
       {
@@ -1080,7 +1080,7 @@ export async function updateDbtPaymentStatus(status: 'pending' | 'in_progress' |
         type: 'sms',
         sender: 'VM-ANNDWR',
         title: 'SMS: DBT भुगतान सफल',
-        message: `VM-ANNDWR: AnnaDwar - बैंक खाता क्रेडिट सफल! MSP उपार्जन राशि DBT द्वारा UTR ${dbtUtrNumber} से जमा हुई। - किसान से देश तक`,
+        message: `VM-ANNDWR: AnnDwar - बैंक खाता क्रेडिट सफल! MSP उपार्जन राशि DBT द्वारा UTR ${dbtUtrNumber} से जमा हुई। - किसान से देश तक`,
         timestamp: timeStr
       }
     );

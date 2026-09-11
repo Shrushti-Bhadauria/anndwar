@@ -263,7 +263,7 @@ export const LiveQueueTracker: React.FC<LiveQueueTrackerProps> = ({
               <button
                 onClick={() => {
                   const dirText = isHi ? directive.textHi : directive.textEn;
-                  const fullMsg = `🌾 AnnaDwar - Kisan se Desh Tak 🌾\nनमस्ते ${directive.farmerName || 'किसान भाई'}, लाइव उपार्जन निर्देश:\n\n📢 "${dirText}"\n\nटोकन: ${directive.token}\nकेंद्र: ${activeSlot?.mandiCenterName || 'सांवेर उपार्जन केंद्र'}`;
+                  const fullMsg = `🌾 AnnDwar - Kisan se Desh Tak 🌾\nनमस्ते ${directive.farmerName || 'किसान भाई'}, लाइव उपार्जन निर्देश:\n\n📢 "${dirText}"\n\nटोकन: ${directive.token}\nकेंद्र: ${activeSlot?.mandiCenterName || 'सांवेर उपार्जन केंद्र'}`;
                   openRealWhatsApp(activeSlot?.farmerId ? undefined : '9826199999', fullMsg);
                 }}
                 className="text-xs font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white px-3 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-xs"

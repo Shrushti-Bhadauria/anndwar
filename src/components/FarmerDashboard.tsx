@@ -229,7 +229,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
 
           <button
             onClick={() => {
-              const testMsg = `🌾 AnnaDwar - Kisan se Desh Tak 🌾\nनमस्ते ${farmer?.nameHi || 'किसान भाई'}, यह आपके पंजीकृत मोबाइल (+91 ${farmer?.phone || '9826199999'}) पर पुष्टि संदेश है। आपका टोकन #${slot?.tokenNumber || 'MP-88210'} सक्रिय है। हेल्पलाइन: 1800-180-1551।`;
+              const testMsg = `🌾 AnnDwar - Kisan se Desh Tak 🌾\nनमस्ते ${farmer?.nameHi || 'किसान भाई'}, यह आपके पंजीकृत मोबाइल (+91 ${farmer?.phone || '9826199999'}) पर पुष्टि संदेश है। आपका टोकन #${slot?.tokenNumber || 'MP-88210'} सक्रिय है। हेल्पलाइन: 1800-180-1551।`;
               openRealWhatsApp(farmer?.phone || '9826199999', testMsg);
             }}
             className="bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer"
@@ -272,7 +272,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
             <button
               onClick={() => {
                 const directiveText = directive?.textHi || `टोकन #${slot?.tokenNumber || 'MP-88210'}: स्लॉट पुष्ट हुआ! निर्धारित समय पर ${slot?.mandiCenterName || 'सांवेर उपार्जन केंद्र'} के ${slot?.gateNumber || 'गेट क्र. 02'} पर पहुंचें।`;
-                const fullMsg = `🌾 AnnaDwar - Kisan se Desh Tak 🌾\nनमस्ते ${farmer?.nameHi || 'किसान भाई'}, मंडी ऑपरेटर का लाइव निर्देश:\n\n📢 "${directiveText}"\n\nटोकन: #${slot?.tokenNumber || 'MP-88210'}\nवाहन: ${slot?.vehicleNumber || farmer?.vehicleNumber || 'MP-09-GE-4102'}\nकेंद्र: ${slot?.mandiCenterName || 'सांवेर उपार्जन केंद्र'}`;
+                const fullMsg = `🌾 AnnDwar - Kisan se Desh Tak 🌾\nनमस्ते ${farmer?.nameHi || 'किसान भाई'}, मंडी ऑपरेटर का लाइव निर्देश:\n\n📢 "${directiveText}"\n\nटोकन: #${slot?.tokenNumber || 'MP-88210'}\nवाहन: ${slot?.vehicleNumber || farmer?.vehicleNumber || 'MP-09-GE-4102'}\nकेंद्र: ${slot?.mandiCenterName || 'सांवेर उपार्जन केंद्र'}`;
                 openRealWhatsApp(farmer?.phone || '9826199999', fullMsg);
               }}
               className="text-xs font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white px-3 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
@@ -557,7 +557,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                   <h3 className="font-extrabold text-base tracking-tight flex items-center gap-1.5">
                     <span>{isHi ? 'किसान संदेश अलर्ट' : 'Farmer Alert Messages'}</span>
                     <span className="text-[10px] bg-emerald-700 text-emerald-100 font-semibold px-2 py-0.5 rounded-full border border-emerald-500">
-                      AnnaDwar - Kisan se Desh Tak
+                      AnnDwar - Kisan se Desh Tak
                     </span>
                   </h3>
                   <p className="text-xs text-emerald-200 mt-0.5">
@@ -668,7 +668,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                             <span>असली WhatsApp पर खोलें</span>
                           </button>
                         )}
-                        <span className="font-semibold text-emerald-700">AnnaDwar - Kisan se Desh Tak</span>
+                        <span className="font-semibold text-emerald-700">AnnDwar - Kisan se Desh Tak</span>
                       </div>
                     </div>
                   </div>

@@ -103,13 +103,13 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
         msgText = `📜 ई-पावती निर्गत!\nनमस्ते ${fName} जी, आपके टोकन ${token} की डिजिटल पावती जारी हो गई है। DBT बैंक अंतरण प्रक्रिया प्रारंभ हो चुकी है।\nउपार्जन केंद्र: ${item?.mandiName || 'सांवेर उपार्जन केंद्र'}`;
         setActionSuccess(`✓ टोकन ${token} (${fName}) की डिजिटल पावती निर्गत हुई! DBT बैंक भुगतान प्रक्रिया प्रारंभ।`);
       } else {
-        msgText = `🌾 AnnaDwar: टोकन ${token} की कार्यवाही अपडेट हुई।`;
+        msgText = `🌾 AnnDwar: टोकन ${token} की कार्यवाही अपडेट हुई।`;
         setActionSuccess(`✓ कार्यवाही सफल: टोकन ${token}`);
       }
 
       setLastWhatsAppAction({
         phone: fPhone,
-        message: `🌾 AnnaDwar - Kisan se Desh Tak 🌾\n${msgText}\nटोल-फ्री हेल्पलाइन: 1800-180-1551`,
+        message: `🌾 AnnDwar - Kisan se Desh Tak 🌾\n${msgText}\nटोल-फ्री हेल्पलाइन: 1800-180-1551`,
         farmerName: fName
       });
 
@@ -352,7 +352,7 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                         <span>वाहन: <strong className="font-mono text-[#143224]">{farmerVehicle}</strong> | {farmerCrop} | 📱 +91 {farmerPhone}</span>
                         <button
                           onClick={() => {
-                            const msg = `🌾 AnnaDwar - Kisan se Desh Tak 🌾\nनमस्ते ${farmerName} जी, आपके टोकन ${farmerToken} (वाहन: ${farmerVehicle}) का उपार्जन केंद्र पर सत्यापन किया जा रहा है।`;
+                            const msg = `🌾 AnnDwar - Kisan se Desh Tak 🌾\nनमस्ते ${farmerName} जी, आपके टोकन ${farmerToken} (वाहन: ${farmerVehicle}) का उपार्जन केंद्र पर सत्यापन किया जा रहा है।`;
                             openRealWhatsApp(farmerPhone, msg);
                           }}
                           className="inline-flex items-center gap-1 text-[11px] font-bold text-[#128C7E] bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 px-2 py-0.5 rounded cursor-pointer transition-colors"
@@ -617,7 +617,7 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                         {/* Real WhatsApp Button for this Farmer */}
                         <button
                           onClick={() => {
-                            const msg = `🌾 AnnaDwar - Kisan se Desh Tak 🌾\nनमस्ते ${item.farmerName} जी, आपके टोकन ${item.token} (वाहन: ${item.vehicleNo}) की वर्तमान स्थिति: "${item.stage}"। उपार्जन केंद्र: ${item.mandiName}। कृपया समय पर उपस्थित रहें। - AnnaDwar`;
+                            const msg = `🌾 AnnDwar - Kisan se Desh Tak 🌾\nनमस्ते ${item.farmerName} जी, आपके टोकन ${item.token} (वाहन: ${item.vehicleNo}) की वर्तमान स्थिति: "${item.stage}"। उपार्जन केंद्र: ${item.mandiName}। कृपया समय पर उपस्थित रहें। - AnnDwar`;
                             openRealWhatsApp(item.phone, msg);
                           }}
                           className="px-2.5 py-1.5 bg-[#eaf7ee] hover:bg-[#d5f2dc] text-[#128C7E] border border-[#25D366]/60 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs inline-flex items-center gap-1"

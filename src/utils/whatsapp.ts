@@ -1,5 +1,5 @@
 /**
- * WhatsApp Helper Utilities for AnnaDwar - Kisan se Desh Tak
+ * WhatsApp Helper Utilities for AnnDwar - Kisan se Desh Tak
  * Generates direct universal wa.me deep links to launch real WhatsApp
  * on Desktop (WhatsApp Web / App) and Mobile (WhatsApp App).
  */
