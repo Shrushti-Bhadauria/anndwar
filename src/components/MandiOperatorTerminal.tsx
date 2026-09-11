@@ -7,13 +7,14 @@ import {
   QrCode, 
   Search, 
   RefreshCw, 
-  Ship, 
   Check, 
   Clock,
   ArrowRight,
-  Microscope,
   Scale,
-  Building2
+  Building2,
+  AlertCircle,
+  FileCheck2,
+  Sparkles
 } from 'lucide-react';
 import { Language, MandiSlot } from '../types';
 
@@ -21,14 +22,13 @@ interface MandiOperatorTerminalProps {
   lang: Language;
   activeSlot: MandiSlot | null;
   onOpenReceipt: () => void;
-  onViewFarmerPortal: () => void;
+  onViewFarmerPortal?: () => void;
 }
 
 export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
   lang,
   activeSlot,
   onOpenReceipt,
-  onViewFarmerPortal,
 }) => {
   const isHi = lang === 'hi';
 
@@ -36,16 +36,18 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
   const [filterTab, setFilterTab] = useState<string>('all');
   const [gateApproved, setGateApproved] = useState<boolean>(false);
   const [actionSuccess, setActionSuccess] = useState<string>('');
+  const [todaySlotsCount, setTodaySlotsCount] = useState<number>(120);
+  const [yardQueueCount, setYardQueueCount] = useState<number>(14);
 
   const [queueItems, setQueueItems] = useState([
     {
       token: '#MP-2409',
-      farmerName: 'राम सिंह',
+      farmerName: 'राम सिंह (Ram Singh)',
       farmerId: 'MP-88210',
       vehicleNo: 'MP 09 GH 4412',
-      crop: 'गेहूँ (45 Qt)',
+      crop: 'शरबती गेहूँ (45 Qt)',
       arrivalTime: '11:15 AM (27m)',
-      stage: 'गुणवत्ता जाँच',
+      stage: 'गुणवत्ता जाँच (Lab)',
       stageType: 'quality',
       actionType: 'call_scale',
       actionLabel: 'कांटा #02 पर बुलाएं',
@@ -97,169 +99,211 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
       stage: 'पावती जारी (Ready)',
       stageType: 'ready',
       actionType: 'completed',
-      actionLabel: '✓',
+      actionLabel: '✓ पूर्ण',
     },
   ]);
 
   const handleAction = (token: string, actionType: string) => {
     if (actionType === 'call_scale') {
       setActionSuccess(`टोकन ${token} को कांटा #02 पर सफलतापूर्वक आमंत्रित किया गया!`);
+      setQueueItems((prev) =>
+        prev.map((it) =>
+          it.token === token
+            ? { ...it, stage: '✓ तौल कांटा #02 (चालू)', stageType: 'weighment', actionType: 'record_weight', actionLabel: 'वजन रिकॉर्ड' }
+            : it
+        )
+      );
     } else if (actionType === 'gate_call') {
       setActionSuccess(`टोकन ${token} (कमल किशोर) को मुख्य गेट पर बुलाया गया!`);
+      setQueueItems((prev) =>
+        prev.map((it) =>
+          it.token === token
+            ? { ...it, stage: 'गुणवत्ता जाँच', stageType: 'quality', actionType: 'call_scale', actionLabel: 'कांटा पर बुलाएं' }
+            : it
+        )
+      );
     } else if (actionType === 'record_weight') {
-      setActionSuccess(`टोकन ${token} का धर्मकांटा वजन रिकॉर्ड स्क्रीन सक्रिय!`);
+      setActionSuccess(`टोकन ${token} का वजन (45.2 क्विंटल) सफलतापूर्वक दर्ज हुआ!`);
+      setQueueItems((prev) =>
+        prev.map((it) =>
+          it.token === token
+            ? { ...it, stage: 'वेयरहाउस अनलोडिंग', stageType: 'unloading', actionType: 'slip_recommend', actionLabel: 'पर्ची संस्तुति' }
+            : it
+        )
+      );
     } else if (actionType === 'slip_recommend') {
       setActionSuccess(`टोकन ${token} की उपार्जन पावती संस्तुत की गई!`);
+      setQueueItems((prev) =>
+        prev.map((it) =>
+          it.token === token
+            ? { ...it, stage: 'पावती जारी (Ready)', stageType: 'ready', actionType: 'completed', actionLabel: '✓ पूर्ण' }
+            : it
+        )
+      );
     }
-    setTimeout(() => setActionSuccess(''), 3000);
+    setTimeout(() => setActionSuccess(''), 4000);
   };
 
   const handleGateEntry = () => {
     setGateApproved(true);
+    setYardQueueCount((prev) => prev + 1);
     setActionSuccess('प्रवेश स्वीकृत! टोकन #MP-2409 (राम सिंह) यार्ड कतार में शामिल हुआ।');
-    setTimeout(() => setActionSuccess(''), 3000);
+    setTimeout(() => setActionSuccess(''), 4000);
   };
 
+  const filteredQueue = queueItems.filter((item) => {
+    if (filterTab === 'all') return true;
+    if (filterTab === 'gate') return item.stageType === 'gate_wait';
+    if (filterTab === 'quality') return item.stageType === 'quality';
+    if (filterTab === 'scale') return item.stageType === 'weighment';
+    if (filterTab === 'receipt') return item.stageType === 'ready' || item.stageType === 'unloading';
+    return true;
+  });
+
   return (
-    <div className="flex-1 p-3.5 sm:p-6 lg:p-8 max-w-6xl space-y-6">
-      {/* Top Portal Banner */}
-      <div className="bg-gradient-to-r from-[#1b4d3e] to-[#256653] text-white p-4 sm:p-5 rounded-2xl shadow-sm border border-[#143e31] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 text-amber-300 flex items-center justify-center font-bold">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg sm:text-xl font-black text-white">
-                {isHi ? 'मंडी ऑपरेटर टर्मिनल (गेट व तौल नियंत्रण)' : 'Mandi Operator Terminal (Gate & Scale Control)'}
-              </h2>
-              <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full">
-                LIVE GATE #02
-              </span>
-            </div>
-            <p className="text-xs text-[#b8e5d3] mt-0.5">
-              {isHi ? 'सांवेर उपार्जन केंद्र • टोकन प्रवेश, धर्मकांटा वजन रिकॉर्ड व ई-पावती संस्तुति' : 'Sanwer Centre • Gate Entry, Scale Weighment & e-Pauti Issuance'}
-            </p>
-          </div>
+    <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+      {/* Top Greeting & Center Info */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#1b7e45] animate-pulse"></span>
+          <h2 className="text-xl sm:text-2xl font-bold text-[#143224] tracking-tight">
+            {isHi ? 'मंडी ऑपरेटर टर्मिनल (सांवेर उपार्जन केंद्र)' : 'Mandi Operator Terminal (Sanwer Centre)'}
+          </h2>
         </div>
 
-        <button
-          onClick={onViewFarmerPortal}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/15 hover:bg-white text-white hover:text-[#1b4d3e] border border-white/30 text-xs font-bold transition-all cursor-pointer shadow-xs"
-        >
-          <span>← {isHi ? 'किसान पोर्टल पर लौटें' : 'Back to Farmer Portal'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-white border border-[#cfe0d5] text-[#29563f] text-xs font-semibold px-3 py-1.5 rounded-xl shadow-xs">
+            <Calendar className="w-3.5 h-3.5 text-[#1b7e45]" />
+            <span>24 अक्टूबर 2025</span>
+          </div>
+          <span className="text-[11px] font-bold bg-[#fffae6] text-[#854d0e] border border-amber-300 px-2.5 py-1 rounded-xl">
+            गेट #02 लाइव
+          </span>
+        </div>
       </div>
 
-      {/* Action toast */}
+      {/* Action Toast / Live Banner */}
       {actionSuccess && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs">
-          <span>✅ {actionSuccess}</span>
-          <button onClick={() => setActionSuccess('')} className="text-emerald-700 hover:text-black">✕</button>
+        <div className="bg-[#edf9f2] border border-[#a6e2bf] text-[#14532d] px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xs animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-[#1b7e45]" />
+            <span>{actionSuccess}</span>
+          </div>
+          <button onClick={() => setActionSuccess('')} className="text-[#14532d] hover:text-black font-bold cursor-pointer">✕</button>
         </div>
       )}
 
-      {/* Top 3 Summary Stat Cards (Strictly Image 1) */}
+      {/* 3 Summary Stat Cards (Clean, calm, matching Farmer Dashboard) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: आज कुल स्लॉट बुक */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex items-center justify-between">
+        {/* Stat 1: Total Slots */}
+        <div className="bg-white rounded-2xl border border-[#d2dfd6] p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-gray-500 block">
-              आज कुल स्लॉट बुक
+            <span className="text-xs font-medium text-[#637d70] block">
+              {isHi ? 'आज कुल स्लॉट बुक' : 'Today Total Booked Slots'}
             </span>
-            <div className="my-1.5 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-[#0f3d2e] tracking-tight">
-                120
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-[#143224] tracking-tight">
+                {todaySlotsCount}
               </span>
-              <span className="text-sm font-bold text-gray-700">
-                किसान
+              <span className="text-xs font-semibold text-[#3b6750]">
+                {isHi ? 'पंजीकृत किसान' : 'Registered Farmers'}
               </span>
             </div>
+            <p className="text-[11px] text-[#2c8352] mt-1 font-medium">
+              {isHi ? '✓ सभी स्लॉट प्रमाणित' : 'All slots verified'}
+            </p>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100">
+          <div className="w-11 h-11 rounded-xl bg-[#eef7f1] text-[#1b7e45] flex items-center justify-center border border-[#d5e8dc]">
             <Calendar className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Card 2: गेट पर / इन-परिसर */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex items-center justify-between">
+        {/* Stat 2: In-Yard Queued Vehicles */}
+        <div className="bg-white rounded-2xl border border-[#d2dfd6] p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-gray-500 block">
-              गेट पर / इन-परिसर
+            <span className="text-xs font-medium text-[#637d70] block">
+              {isHi ? 'परिसर में सक्रिय वाहन' : 'Vehicles in Mandi Yard'}
             </span>
-            <div className="my-1.5 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-[#b45309] tracking-tight">
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-[#854d0e] tracking-tight">
                 42
               </span>
-              <span className="text-sm font-bold text-gray-800">
-                ट्रॉलीयां <span className="text-xs text-gray-500 font-normal">(कतार: 14)</span>
+              <span className="text-xs font-semibold text-[#854d0e]">
+                {isHi ? `(कतार: ${yardQueueCount})` : `(Queue: ${yardQueueCount})`}
               </span>
             </div>
+            <p className="text-[11px] text-[#854d0e] mt-1 font-medium">
+              {isHi ? 'मध्यम यातायात • सुचारू तौल' : 'Smooth movement'}
+            </p>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-amber-50 text-[#b45309] flex items-center justify-center border border-amber-100">
+          <div className="w-11 h-11 rounded-xl bg-[#fffbeb] text-[#b45309] flex items-center justify-center border border-[#fef3c7]">
             <Truck className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Card 3: गुणवत्ता स्थिति (Moisture/FAQ) */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex items-center justify-between">
+        {/* Stat 3: Quality Lab Pass */}
+        <div className="bg-white rounded-2xl border border-[#d2dfd6] p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-gray-500 block">
-              गुणवत्ता स्थिति (Moisture/FAQ)
+            <span className="text-xs font-medium text-[#637d70] block">
+              {isHi ? 'गुणवत्ता स्थिति (नमी परीक्षण)' : 'Quality Moisture Status'}
             </span>
-            <div className="my-1.5 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-[#1b5e20] tracking-tight">
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-[#1b7e45] tracking-tight">
                 36
               </span>
-              <span className="text-sm font-bold text-emerald-800">
-                पास <span className="text-xs text-red-600 font-normal">/ 2 रीचेक</span>
+              <span className="text-xs font-semibold text-[#2c8352]">
+                {isHi ? 'पास / 2 रीचेक' : 'Passed / 2 Recheck'}
               </span>
             </div>
+            <p className="text-[11px] text-[#2c8352] mt-1 font-medium">
+              {isHi ? 'औसत नमी: 11.2% (<12% FAQ)' : 'Avg Moisture 11.2%'}
+            </p>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-[#1b5e20] flex items-center justify-center border border-emerald-100">
+          <div className="w-11 h-11 rounded-xl bg-[#eef7f1] text-[#1b7e45] flex items-center justify-center border border-[#d5e8dc]">
             <CheckCircle2 className="w-5 h-5" />
           </div>
         </div>
       </div>
 
-      {/* Gate Entry & Barcode Scanner Panel (Strictly Image 1) */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs space-y-4">
-        <div className="flex items-start justify-between">
+      {/* Gate Entry & Barcode Scanner Panel */}
+      <div className="bg-white rounded-2xl border border-[#d2dfd6] p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-amber-700 font-bold">::</span>
-              <h3 className="text-base font-bold text-gray-900">
-                गेट प्रवेश एवं किसान सत्यापन (Gate Entry & Barcode Scanner)
-              </h3>
-            </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              किसान के मोबाइल SMS/पर्ची का QR कोड स्कैन करें या टोकन नंबर दर्ज करें
+            <h3 className="text-sm font-bold text-[#143224]">
+              {isHi ? 'गेट प्रवेश एवं किसान सत्यापन (Gate Entry Scanner)' : 'Gate Entry & Farmer Verification'}
+            </h3>
+            <p className="text-xs text-[#597867] mt-0.5">
+              {isHi ? 'मोबाइल SMS/पर्ची का QR कोड स्कैन करें या टोकन नंबर खोजें' : 'Scan QR code or search token to approve entry'}
             </p>
           </div>
-          <span className="text-[11px] font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-md border border-gray-200">
-            गेट #01 लाइव
+          <span className="text-[11px] font-semibold bg-[#eef7f1] text-[#1b7e45] px-2.5 py-1 rounded-lg border border-[#c4e3d1]">
+            गेट लेन #01 चालू
           </span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Left Scan Box */}
-          <div className="lg:col-span-4 border border-gray-200 rounded-xl p-4 bg-[#fbfdfb] flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 rounded-full border border-gray-300 bg-white flex items-center justify-center mb-3 text-gray-600 shadow-2xs">
+          {/* Scan Camera Box */}
+          <div className="lg:col-span-4 border border-[#d2dfd6] rounded-xl p-4 bg-[#fbfdfb] flex flex-col items-center justify-center text-center">
+            <div className="w-12 h-12 rounded-full border border-[#d2dfd6] bg-white flex items-center justify-center mb-2.5 text-[#1b4d3e] shadow-xs">
               <Camera className="w-6 h-6" />
             </div>
             <button
-              onClick={() => alert('कैमरा स्कैनर सक्रिय: QR कोड को कैमरे के सामने लाएं')}
-              className="w-full py-2 px-3 bg-[#8b4513] hover:bg-[#6f370f] text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+              onClick={() => {
+                setActionSuccess('कैमरा स्कैनर सक्रिय: QR कोड सफलतापूर्वक स्कैन हुआ (#MP-2409)!');
+                setSearchToken('#MP-2409');
+                setTimeout(() => setActionSuccess(''), 3000);
+              }}
+              className="w-full py-2.5 px-3 bg-[#1b4d3e] hover:bg-[#143e31] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer"
             >
-              <QrCode className="w-4 h-4" />
-              <span>स्कैन करें (Scan QR / Barcode)</span>
+              <QrCode className="w-4 h-4 text-[#88f0bc]" />
+              <span>{isHi ? 'QR स्कैन करें (Scan QR)' : 'Scan Barcode / QR'}</span>
             </button>
-            <p className="text-[11px] text-gray-400 mt-2">
-              अथवा RFID टैग वाहन सेंसर पर लाएं
+            <p className="text-[10.5px] text-[#718b7c] mt-2">
+              {isHi ? 'वाहन RFID टैग स्वतः स्कैन समर्थित' : 'RFID Sensor auto-detect enabled'}
             </p>
           </div>
 
-          {/* Right Verification Card */}
+          {/* Farmer Verification Box */}
           <div className="lg:col-span-8 space-y-3">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -269,41 +313,44 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                   value={searchToken}
                   onChange={(e) => setSearchToken(e.target.value)}
                   placeholder="#MP-2409"
-                  className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-xs font-bold font-mono text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                  className="w-full border border-[#cfe0d5] rounded-xl pl-9 pr-3 py-2 text-xs font-bold font-mono text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-[#1b7e45]"
                 />
               </div>
               <button
-                onClick={() => setGateApproved(false)}
-                className="px-4 py-2 bg-[#0f3d2e] hover:bg-black text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                onClick={() => {
+                  setActionSuccess('टोकन #MP-2409 सत्यापित हुआ: राम सिंह (सांवेर)');
+                  setTimeout(() => setActionSuccess(''), 3000);
+                }}
+                className="px-4 py-2 bg-[#1b4d3e] hover:bg-[#153e32] text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-xs"
               >
-                <Check className="w-3.5 h-3.5" />
-                <span>खोजें</span>
+                <Check className="w-3.5 h-3.5 text-[#88f0bc]" />
+                <span>{isHi ? 'सत्यापित करें' : 'Verify'}</span>
               </button>
             </div>
 
-            {/* Farmer Info Box */}
-            <div className="border border-gray-200 rounded-xl p-3 bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            {/* Farmer Info preview */}
+            <div className="border border-[#cfe0d5] rounded-xl p-3.5 bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#dcfce7] text-[#14532d] font-bold flex items-center justify-center text-sm flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-[#eef7f1] text-[#14532d] font-bold flex items-center justify-center text-sm border border-[#bce3cb]">
                   RS
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-gray-900">राम सिंह (Ram Singh)</span>
-                    <span className="text-[10px] font-bold bg-[#dcfce7] text-[#14532d] px-1.5 py-0.2 rounded">
-                      ई-केवाईसी पास
+                    <span className="font-bold text-sm text-[#143224]">राम सिंह (Ram Singh)</span>
+                    <span className="text-[10px] font-bold bg-[#e3f7ec] text-[#147437] border border-[#a8e3c1] px-1.5 py-0.2 rounded">
+                      e-KYC पास
                     </span>
                   </div>
-                  <p className="text-xs text-gray-600 mt-0.5 font-medium">
-                    वाहन: <strong className="font-mono text-gray-900">MP 09 GH 4412</strong> | शरबती गेहूँ (~45 क्विंटल)
+                  <p className="text-xs text-[#527060] mt-0.5">
+                    वाहन: <strong className="font-mono text-[#143224]">MP 09 GH 4412</strong> | शरबती गेहूँ (45 क्विंटल)
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={handleGateEntry}
-                className={`px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer ${
-                  gateApproved ? 'bg-[#14532d]' : 'bg-[#1b5e20] hover:bg-emerald-900'
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer ${
+                  gateApproved ? 'bg-[#14532d]' : 'bg-[#1b7e45] hover:bg-[#156337]'
                 }`}
               >
                 <span>🚢</span>
@@ -314,96 +361,93 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
         </div>
       </div>
 
-      {/* Real-Time Mandi Yard Queue Panel (Strictly Image 1) */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+      {/* Real-Time Yard Queue Table */}
+      <div className="bg-white rounded-2xl border border-[#d2dfd6] p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#edf3ef] pb-3">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[#1b5e20] font-bold">::</span>
-              <h3 className="text-base font-bold text-gray-900">
-                सक्रिय कतार प्रबंधन (Real-Time Mandi Yard Queue)
-              </h3>
-            </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              परिसर के विभिन्न चरणों में कार्यरत वाहनों की स्थिति व कॉल नियंत्रण
+            <h3 className="text-sm font-bold text-[#143224]">
+              {isHi ? 'सक्रिय कतार प्रबंधन (Real-Time Mandi Yard Queue)' : 'Active Yard Queue'}
+            </h3>
+            <p className="text-xs text-[#597867] mt-0.5">
+              {isHi ? 'परिसर के विभिन्न चरणों में वाहनों की स्थिति एवं तौल कांटा नियंत्रण' : 'Manage vehicles across testing, weighbridge, and slip generation'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-            <span className="inline-flex items-center gap-1 text-amber-700">
-              <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse"></span>
-              लाइव ऑटो-सिंक (5s)
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#597867]">
+            <span className="inline-flex items-center gap-1 text-[#2c8352]">
+              <span className="w-2 h-2 rounded-full bg-[#1b7e45] animate-ping"></span>
+              {isHi ? 'लाइव सिंक' : 'Live Sync'}
             </span>
             <button
-              onClick={() => alert('कतार डेटा रिफ्रेश हुआ!')}
-              className="p-1 hover:bg-gray-100 rounded cursor-pointer"
+              onClick={() => {
+                setActionSuccess('कतार डेटा रिफ्रेश हुआ!');
+                setTimeout(() => setActionSuccess(''), 2000);
+              }}
+              className="p-1 hover:bg-[#f0f5f2] rounded-lg transition-colors cursor-pointer"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
+              <RefreshCw className="w-3.5 h-3.5 text-[#2c8352]" />
             </button>
           </div>
         </div>
 
-        {/* Filter Pills matching Image 1 */}
+        {/* Filter Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-semibold">
           <button
             onClick={() => setFilterTab('all')}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all cursor-pointer ${
               filterTab === 'all'
-                ? 'bg-[#0f3d2e] text-white font-bold'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#1b4d3e] text-white shadow-xs'
+                : 'bg-[#f0f5f2] text-[#3d5f4e] hover:bg-[#e4eee7]'
             }`}
           >
-            सभी वाहन 42
+            {isHi ? 'सभी वाहन (42)' : 'All Vehicles (42)'}
           </button>
           <button
             onClick={() => setFilterTab('gate')}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all cursor-pointer ${
               filterTab === 'gate'
-                ? 'bg-[#0f3d2e] text-white font-bold'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#1b4d3e] text-white shadow-xs'
+                : 'bg-[#f0f5f2] text-[#3d5f4e] hover:bg-[#e4eee7]'
             }`}
           >
-            गेट पर प्रतीक्षारत 14
+            {isHi ? 'गेट प्रतीक्षारत (14)' : 'Gate Wait (14)'}
           </button>
           <button
             onClick={() => setFilterTab('quality')}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all cursor-pointer ${
               filterTab === 'quality'
-                ? 'bg-[#b45309] text-white font-bold'
-                : 'bg-[#fff7ed] text-[#b45309] border border-amber-200 hover:bg-amber-100'
+                ? 'bg-[#b45309] text-white shadow-xs'
+                : 'bg-[#fffbeb] text-[#b45309] border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            <span>गुणवत्ता जाँच (Lab)</span>
-            <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] flex items-center justify-center">
-              6
-            </span>
+            {isHi ? 'गुणवत्ता लैब (6)' : 'Quality Lab (6)'}
           </button>
           <button
             onClick={() => setFilterTab('scale')}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all cursor-pointer ${
               filterTab === 'scale'
-                ? 'bg-[#0f3d2e] text-white font-bold'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#1b4d3e] text-white shadow-xs'
+                : 'bg-[#f0f5f2] text-[#3d5f4e] hover:bg-[#e4eee7]'
             }`}
           >
-            तौल कांटा (Scale) 4
+            {isHi ? 'तौल कांटा (4)' : 'Weighbridge (4)'}
           </button>
           <button
             onClick={() => setFilterTab('receipt')}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all cursor-pointer ${
               filterTab === 'receipt'
-                ? 'bg-[#0f3d2e] text-white font-bold'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#1b4d3e] text-white shadow-xs'
+                : 'bg-[#f0f5f2] text-[#3d5f4e] hover:bg-[#e4eee7]'
             }`}
           >
-            पावती / निकासी 18
+            {isHi ? 'पावती / निकासी (18)' : 'Receipt Issued (18)'}
           </button>
         </div>
 
-        {/* Table strictly matching Image 1 */}
-        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+        {/* Clean Queue Table */}
+        <div className="overflow-x-auto border border-[#d2dfd6] rounded-xl">
           <table className="w-full text-xs text-left">
-            <thead className="bg-[#f9faf9] text-gray-700 font-bold border-b border-gray-200">
+            <thead className="bg-[#f8faf8] text-[#3d5f4e] font-bold border-b border-[#d2dfd6]">
               <tr>
                 <th className="p-3">टोकन #</th>
                 <th className="p-3">किसान नाम</th>
@@ -414,56 +458,56 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                 <th className="p-3 text-right">त्वरित कार्यवाही</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {queueItems.map((item, idx) => (
+            <tbody className="divide-y divide-[#edf3ef]">
+              {filteredQueue.map((item) => (
                 <tr
                   key={item.token}
-                  className={`hover:bg-[#f6faf7] transition-colors ${
-                    item.isFirst ? 'border-l-4 border-l-[#b45309] bg-[#fffdfa]' : ''
+                  className={`hover:bg-[#f4f9f5] transition-colors ${
+                    item.isFirst ? 'bg-[#fcfefa] border-l-4 border-l-[#1b7e45]' : ''
                   }`}
                 >
-                  <td className="p-3 font-mono font-black text-[#b45309]">
+                  <td className="p-3 font-mono font-bold text-[#854d0e]">
                     {item.token}
                   </td>
                   <td className="p-3">
-                    <span className="font-bold text-gray-900 block">{item.farmerName}</span>
-                    <span className="text-[10px] text-gray-500 font-mono">ID: {item.farmerId}</span>
+                    <span className="font-bold text-[#143224] block">{item.farmerName}</span>
+                    <span className="text-[10px] text-[#638472] font-mono">ID: {item.farmerId}</span>
                   </td>
                   <td className="p-3 font-mono font-bold text-gray-800">
                     {item.vehicleNo}
                   </td>
                   <td className="p-3">
-                    <span className="inline-block bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-800">
+                    <span className="inline-block bg-[#f0f5f2] border border-[#d2dfd6] px-2 py-0.5 rounded text-[11px] font-semibold text-[#183525]">
                       {item.crop}
                     </span>
                   </td>
-                  <td className="p-3 text-gray-600 font-medium">
+                  <td className="p-3 text-[#527060] font-medium">
                     {item.arrivalTime}
                   </td>
                   <td className="p-3">
                     {item.stageType === 'quality' && (
-                      <span className="inline-flex items-center gap-1.5 bg-[#fff7ed] text-[#b45309] font-bold px-2.5 py-1 rounded-full text-[11px] border border-amber-200">
-                        <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                      <span className="inline-flex items-center gap-1.5 bg-[#fffbeb] text-[#854d0e] font-bold px-2.5 py-1 rounded-full text-[11px] border border-amber-200">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                         {item.stage}
                       </span>
                     )}
                     {item.stageType === 'gate_wait' && (
-                      <span className="inline-block bg-gray-100 text-gray-600 font-medium px-2.5 py-1 rounded-full text-[11px]">
+                      <span className="inline-block bg-[#f0f5f2] text-gray-600 font-medium px-2.5 py-1 rounded-full text-[11px]">
                         {item.stage}
                       </span>
                     )}
                     {item.stageType === 'weighment' && (
-                      <span className="inline-flex items-center gap-1 bg-[#dcfce7] text-[#14532d] font-bold px-2.5 py-1 rounded-full text-[11px] border border-emerald-300">
+                      <span className="inline-flex items-center gap-1 bg-[#eaf5ef] text-[#14532d] font-bold px-2.5 py-1 rounded-full text-[11px] border border-[#a8dec0]">
                         {item.stage}
                       </span>
                     )}
                     {item.stageType === 'unloading' && (
-                      <span className="inline-block bg-[#f1f5f3] text-gray-700 font-medium px-2.5 py-1 rounded-full text-[11px]">
+                      <span className="inline-block bg-[#f0f5f2] text-gray-700 font-medium px-2.5 py-1 rounded-full text-[11px]">
                         {item.stage}
                       </span>
                     )}
                     {item.stageType === 'ready' && (
-                      <span className="inline-flex items-center gap-1 bg-[#e0f2fe] text-[#0369a1] font-bold px-2.5 py-1 rounded-full text-[11px]">
+                      <span className="inline-flex items-center gap-1 bg-[#eff6ff] text-[#1e40af] font-bold px-2.5 py-1 rounded-full text-[11px]">
                         {item.stage}
                       </span>
                     )}
@@ -472,7 +516,7 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                     {item.actionType === 'call_scale' && (
                       <button
                         onClick={() => handleAction(item.token, item.actionType)}
-                        className="px-3.5 py-1.5 bg-[#0f3d2e] hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shadow-2xs cursor-pointer"
+                        className="px-3.5 py-1.5 bg-[#1b4d3e] hover:bg-[#143e31] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
                       >
                         {item.actionLabel}
                       </button>
@@ -480,7 +524,7 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                     {item.actionType === 'gate_call' && (
                       <button
                         onClick={() => handleAction(item.token, item.actionType)}
-                        className="px-3.5 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        className="px-3.5 py-1.5 bg-white border border-[#cfe0d5] hover:bg-[#f0f5f2] text-[#183525] text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs"
                       >
                         {item.actionLabel}
                       </button>
@@ -488,7 +532,7 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                     {item.actionType === 'record_weight' && (
                       <button
                         onClick={() => handleAction(item.token, item.actionType)}
-                        className="px-3.5 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        className="px-3.5 py-1.5 bg-[#1b7e45] hover:bg-[#156337] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs"
                       >
                         {item.actionLabel}
                       </button>
@@ -496,15 +540,19 @@ export const MandiOperatorTerminal: React.FC<MandiOperatorTerminalProps> = ({
                     {item.actionType === 'slip_recommend' && (
                       <button
                         onClick={() => handleAction(item.token, item.actionType)}
-                        className="px-3.5 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        className="px-3.5 py-1.5 bg-white border border-[#cfe0d5] hover:bg-[#f0f5f2] text-[#183525] text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs"
                       >
                         {item.actionLabel}
                       </button>
                     )}
                     {item.actionType === 'completed' && (
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-emerald-700 font-bold border border-emerald-300 bg-emerald-50">
-                        <Check className="w-4 h-4" />
-                      </span>
+                      <button
+                        onClick={onOpenReceipt}
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-emerald-700 font-bold border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>पावती पर्ची</span>
+                      </button>
                     )}
                   </td>
                 </tr>

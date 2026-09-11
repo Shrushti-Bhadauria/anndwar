@@ -56,8 +56,10 @@ export const SlotReceiptModal: React.FC<SlotReceiptModalProps> = ({
         <div className="p-5 sm:p-7 overflow-y-auto print:p-0 space-y-4 text-[#143425]">
           {/* Government / Mandi Header */}
           <div className="text-center pb-3 border-b-2 border-[#1b4d3e]">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <span className="text-2xl">🌾</span>
+            <div className="flex items-center justify-center gap-2.5 mb-1">
+              <div className="w-10 h-10 rounded-full bg-white p-0.5 border border-[#cfe0d5] flex items-center justify-center overflow-hidden shadow-2xs">
+                <img src="/logo.png" alt="अन्नद्वार" className="w-full h-full object-contain" />
+              </div>
               <h2 className="text-lg sm:text-xl font-black tracking-tight text-[#1b4d3e]">
                 अन्नद्वार • म.प्र. शासन ई-उपार्जन प्रणाली
               </h2>

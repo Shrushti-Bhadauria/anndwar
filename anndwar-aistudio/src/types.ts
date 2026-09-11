@@ -1,5 +1,16 @@
 export type Language = 'hi' | 'en';
 
+export type UserRole = 'farmer' | 'mandi_operator' | 'admin';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  phoneOrEmail?: string;
+  stationOrCenter?: string;
+  token?: string;
+}
+
 export interface FarmerProfile {
   id: string;
   nameHi: string;

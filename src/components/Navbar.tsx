@@ -7,182 +7,150 @@ import {
   BarChart3, 
   Truck, 
   Database,
-  Sparkles,
-  ChevronRight
+  LogOut,
+  User,
+  ShieldCheck,
+  Radio,
+  Sparkles
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, AuthUser } from '../types';
 
 interface NavbarProps {
   lang: Language;
   onToggleLang: () => void;
+  currentUser: AuthUser | null;
   currentView: string;
   onSelectView: (view: string) => void;
+  onLogout: () => void;
+  onOpenWhatsAppHelp?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   lang,
   onToggleLang,
+  currentUser,
   currentView,
   onSelectView,
+  onLogout,
+  onOpenWhatsAppHelp,
 }) => {
   const isHi = lang === 'hi';
-
-  const isFarmerActive =
-    currentView.startsWith('farmer_') ||
-    ['live_queue', 'slot_booking', 'crop_check', 'payments', 'documents'].includes(currentView);
-
-  const isMandiActive = currentView === 'mandi_terminal';
-  const isAdminActive = currentView === 'admin_centre';
-
-  // Primary 3 Portals requested prominently on Top Navbar
-  const primaryPortals = [
-    {
-      id: 'farmer_home',
-      labelHi: 'किसान पोर्टल',
-      labelEn: 'Farmer Portal',
-      tagHi: 'अन्नदाता',
-      tagEn: 'Farmer',
-      icon: LayoutDashboard,
-      isActive: isFarmerActive,
-      badge: isFarmerActive ? (isHi ? 'सक्रिय' : 'Active') : null,
-      activeClass: 'bg-white text-[#1b4d3e] shadow-sm ring-1 ring-black/10 font-bold',
-      inactiveClass: 'text-[#e1f3ea] hover:bg-[#153f33] hover:text-white',
-    },
-    {
-      id: 'mandi_terminal',
-      labelHi: 'मंडी ऑपरेटर',
-      labelEn: 'Mandi Operator',
-      tagHi: 'टर्मिनल',
-      tagEn: 'Terminal',
-      icon: Building2,
-      isActive: isMandiActive,
-      badge: isHi ? 'लाइव गेट' : 'Live Gate',
-      badgeColor: 'bg-amber-400/20 text-amber-200 border border-amber-400/40',
-      activeClass: 'bg-[#fffae6] text-[#854d0e] shadow-sm ring-2 ring-amber-400 font-bold',
-      inactiveClass: 'text-[#fae8b4] hover:bg-[#1f4a3c] hover:text-white',
-    },
-    {
-      id: 'admin_centre',
-      labelHi: 'एडमिन पोर्टल',
-      labelEn: 'Admin Portal',
-      tagHi: 'कमांड सेंटर',
-      tagEn: 'HQ Center',
-      icon: BarChart3,
-      isActive: isAdminActive,
-      badge: isHi ? 'कंट्रोल रूम' : 'HQ Live',
-      badgeColor: 'bg-blue-400/20 text-blue-200 border border-blue-400/40',
-      activeClass: 'bg-[#eff6ff] text-[#1e40af] shadow-sm ring-2 ring-blue-400 font-bold',
-      inactiveClass: 'text-[#bfdbfe] hover:bg-[#1a4437] hover:text-white',
-    },
-  ];
-
-  // Secondary Tools / Utilities
-  const secondaryTabs = [
-    {
-      id: 'logistics_godown',
-      labelHi: 'गोदाम',
-      labelEn: 'Godown',
-      icon: Truck,
-      isActive: currentView === 'logistics_godown',
-    },
-    {
-      id: 'mongo_compass',
-      labelHi: 'Compass',
-      labelEn: 'Compass',
-      icon: Database,
-      isActive: currentView === 'mongo_compass',
-    },
-  ];
+  const role = currentUser?.role || 'farmer';
 
   return (
-    <header className="bg-[#1b4d3e] text-white border-b border-[#143e31] sticky top-0 z-40 shadow-md">
-      {/* Top Banner Row */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-3">
-        {/* Brand Logo & Name */}
-        <div
-          onClick={() => onSelectView('farmer_home')}
-          className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group flex-shrink-0"
-          title={isHi ? 'मुख्य किसान पोर्टल पर जाएं' : 'Go to Farmer Portal'}
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 flex items-center justify-center p-1 shadow-inner border border-[#c4dbcf] transition-transform group-hover:scale-105">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#f8faf7] border border-[#2a6b54] flex items-center justify-center text-[#1b4d3e]">
-              <span className="text-lg sm:text-xl leading-none font-bold">🌾</span>
-            </div>
+    <header className="bg-[#1b4d3e] text-white border-b border-[#143e31] sticky top-0 z-40 shadow-sm">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
+        {/* Left: Brand Logo & Contextual Role Badge */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center p-0.5 shadow-sm border border-[#c4dbcf] overflow-hidden flex-shrink-0">
+            <img src="/logo.png" alt="अन्नद्वार" className="w-full h-full object-contain" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">
                 {isHi ? 'अन्नद्वार' : 'Anndwar'}
               </h1>
-              <span className="text-[10px] font-bold bg-[#2a6b54] text-[#d4f3e3] px-1.5 py-0.5 rounded tracking-wider border border-[#3d856b]">
-                MSP e-उपार्जन
-              </span>
+              {role === 'farmer' && (
+                <span className="text-[10px] font-bold bg-[#2a6b54] text-[#d4f3e3] px-2 py-0.5 rounded-full tracking-wider border border-[#3d856b]">
+                  {isHi ? 'किसान पोर्टल' : 'Farmer Portal'}
+                </span>
+              )}
+              {role === 'mandi_operator' && (
+                <span className="text-[10px] font-bold bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full tracking-wider">
+                  {isHi ? 'मंडी ऑपरेटर' : 'Operator Mode'}
+                </span>
+              )}
+              {role === 'admin' && (
+                <span className="text-[10px] font-bold bg-blue-500 text-white px-2 py-0.5 rounded-full tracking-wider">
+                  {isHi ? 'मुख्यालय कमांड' : 'Admin HQ'}
+                </span>
+              )}
             </div>
-            <p className="text-[10.5px] text-[#b8d6c8] hidden md:block leading-none mt-0.5">
-              {isHi ? 'खाद्यान्न उपार्जन, तौल एवं पारदर्शी लॉजिस्टिक्स' : 'Grain Procurement & Transparent Logistics'}
+            <p className="text-[10.5px] text-[#b8d6c8] hidden sm:block leading-none mt-0.5">
+              {role === 'farmer' && (isHi ? 'MSP e-उपार्जन, तौल एवं पारदर्शी भुगतान' : 'MSP Procurement & Direct Benefit Transfer')}
+              {role === 'mandi_operator' && (isHi ? 'सांवेर उपार्जन केंद्र • गेट व तौल नियंत्रण' : 'Sanwer Center • Gate & Weighbridge Console')}
+              {role === 'admin' && (isHi ? 'राज्य स्तरीय खाद्यान्न उपार्जन व साइलो प्रबंधन' : 'State Food & Civil Supplies Procurement Command')}
             </p>
           </div>
         </div>
 
-        {/* Primary 3 Roles Switcher (Prominent Center/Main Navigation) */}
-        <div className="flex items-center gap-1.5 bg-[#143e31]/80 p-1 rounded-2xl border border-[#235846] shadow-inner">
-          {primaryPortals.map((portal) => {
-            const Icon = portal.icon;
-            return (
-              <button
-                key={portal.id}
-                onClick={() => onSelectView(portal.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs transition-all cursor-pointer select-none ${
-                  portal.isActive ? portal.activeClass : portal.inactiveClass
-                }`}
-                title={isHi ? `${portal.labelHi} खोलें` : `Open ${portal.labelEn}`}
-              >
-                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <div className="flex items-baseline gap-1">
-                  <span className="font-bold">{isHi ? portal.labelHi : portal.labelEn}</span>
-                  {portal.tagHi && (
-                    <span className="hidden xl:inline text-[9.5px] opacity-75 font-normal">
-                      ({isHi ? portal.tagHi : portal.tagEn})
-                    </span>
-                  )}
-                </div>
+        {/* Center: Dedicated Sub-Navigation ONLY for Admin role (Clean & uncrowded) */}
+        {role === 'admin' && (
+          <div className="hidden md:flex items-center gap-1.5 bg-[#143e31]/90 p-1 rounded-2xl border border-[#235846] shadow-inner">
+            <button
+              onClick={() => onSelectView('admin_centre')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                currentView === 'admin_centre'
+                  ? 'bg-white text-[#1b4d3e] shadow-xs'
+                  : 'text-[#d4ece0] hover:bg-[#1f4e3f]'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>{isHi ? 'कमांड सेंटर' : 'Command Centre'}</span>
+            </button>
 
-                {portal.badge && (
-                  <span
-                    className={`hidden sm:inline-block text-[9px] font-extrabold px-1.5 py-0.2 rounded-md ${
-                      portal.badgeColor || 'bg-[#1b4d3e]/15 text-[#1b4d3e]'
-                    }`}
-                  >
-                    {portal.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+            <button
+              onClick={() => onSelectView('logistics_godown')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                currentView === 'logistics_godown'
+                  ? 'bg-white text-[#1b4d3e] shadow-xs'
+                  : 'text-[#d4ece0] hover:bg-[#1f4e3f]'
+              }`}
+            >
+              <Truck className="w-3.5 h-3.5 text-[#9ee7c5]" />
+              <span>{isHi ? 'लॉजिस्टिक्स व गोदाम' : 'Logistics & Silos'}</span>
+            </button>
 
-        {/* Right Section: Secondary Tabs + Helpline + Language */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Secondary Views (Logistics & Godown, Compass) */}
-          <div className="hidden lg:flex items-center gap-1 border-r border-[#2d6c55] pr-2">
-            {secondaryTabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => onSelectView(tab.id)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
-                    tab.isActive
-                      ? 'bg-white/20 text-white font-semibold'
-                      : 'text-[#c6e4d6] hover:bg-[#153f33] hover:text-white'
-                  }`}
-                >
-                  <Icon className="w-3 h-3 text-[#9ee7c5]" />
-                  <span>{isHi ? tab.labelHi : tab.labelEn}</span>
-                </button>
-              );
-            })}
+            <button
+              onClick={() => onSelectView('mongo_compass')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                currentView === 'mongo_compass'
+                  ? 'bg-white text-[#1b4d3e] shadow-xs'
+                  : 'text-[#d4ece0] hover:bg-[#1f4e3f]'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 text-[#9ee7c5]" />
+              <span>{isHi ? 'सिस्टम डेटा (Compass)' : 'Database'}</span>
+            </button>
           </div>
+        )}
+
+        {/* Center for Mandi Operator */}
+        {role === 'mandi_operator' && (
+          <div className="hidden md:flex items-center gap-2 bg-[#143e31]/80 px-3 py-1.5 rounded-xl border border-[#235846] text-xs">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            <span className="font-bold text-amber-200">
+              {isHi ? 'गेट #02 वे-ब्रिज व लैब लाइव' : 'Gate #02 & Lab Live'}
+            </span>
+            <span className="text-[#a8d4c2] text-[11px]">• ऑपरेटर: {currentUser?.name || 'राजेश वर्मा'}</span>
+          </div>
+        )}
+
+        {/* Center for Farmer */}
+        {role === 'farmer' && (
+          <div className="hidden lg:flex items-center gap-2 bg-[#143e31]/80 px-3 py-1.5 rounded-xl border border-[#235846] text-xs">
+            <User className="w-3.5 h-3.5 text-[#88f0bc]" />
+            <span className="font-bold text-white">{currentUser?.name || 'राम सिंह'}</span>
+            <span className="text-[#a4d4bf] text-[11px] font-mono">({currentUser?.id || 'MP-88210'})</span>
+            <span className="bg-[#245e4b] text-[#88f0bc] text-[10px] font-bold px-1.5 py-0.2 rounded">
+              {isHi ? 'सत्यापित' : 'Verified'}
+            </span>
+          </div>
+        )}
+
+        {/* Right Section: WhatsApp Helper + Helpline + Lang + Logout */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* WhatsApp Helper Quick Button */}
+          {onOpenWhatsAppHelp && (
+            <button
+              onClick={onOpenWhatsAppHelp}
+              className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full shadow-xs transition-all cursor-pointer"
+              title={isHi ? 'व्हाट्सएप सहायक खोलें' : 'Open WhatsApp Assistant'}
+            >
+              <span>💬</span>
+              <span className="hidden sm:inline">{isHi ? 'व्हाट्सएप' : 'WhatsApp'}</span>
+            </button>
+          )}
 
           {/* Toll Free Helpline */}
           <a
@@ -203,31 +171,42 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Globe className="w-3.5 h-3.5 text-[#91e0bd]" />
             <span>{isHi ? 'हिन्दी' : 'ENG'}</span>
           </button>
+
+          {/* Logout Button */}
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1.5 bg-red-900/30 hover:bg-red-800 text-red-200 hover:text-white text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full border border-red-500/40 transition-all cursor-pointer"
+            title={isHi ? 'लॉगआउट करें एवं भूमिका बदलें' : 'Logout & Switch Account'}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{isHi ? 'लॉगआउट' : 'Logout'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Quick Mobile Bar for Secondary views if on small screens */}
-      <div className="flex lg:hidden items-center justify-between px-3 py-1 bg-[#153f33] border-t border-[#1a4d3f] text-[11px] text-[#c2dfd1]">
-        <div className="flex items-center gap-2">
-          <span>{isHi ? 'अतिरिक्त मॉड्यूल:' : 'Modules:'}</span>
+      {/* Mobile Sub-bar for Admin Views */}
+      {role === 'admin' && (
+        <div className="flex md:hidden items-center justify-around px-3 py-1.5 bg-[#143e31] border-t border-[#1a4d3f] text-xs">
+          <button
+            onClick={() => onSelectView('admin_centre')}
+            className={`px-2 py-1 rounded cursor-pointer ${currentView === 'admin_centre' ? 'bg-white text-[#1b4d3e] font-bold' : 'text-[#c6e4d6]'}`}
+          >
+            📊 {isHi ? 'कमांड सेंटर' : 'HQ'}
+          </button>
           <button
             onClick={() => onSelectView('logistics_godown')}
-            className={`px-2 py-0.5 rounded cursor-pointer ${currentView === 'logistics_godown' ? 'bg-white text-[#1b4d3e] font-bold' : 'hover:text-white'}`}
+            className={`px-2 py-1 rounded cursor-pointer ${currentView === 'logistics_godown' ? 'bg-white text-[#1b4d3e] font-bold' : 'text-[#c6e4d6]'}`}
           >
-            🚛 {isHi ? 'लॉजिस्टिक्स व गोदाम' : 'Logistics'}
+            🚛 {isHi ? 'लॉजिस्टिक्स' : 'Logistics'}
           </button>
           <button
             onClick={() => onSelectView('mongo_compass')}
-            className={`px-2 py-0.5 rounded cursor-pointer ${currentView === 'mongo_compass' ? 'bg-white text-[#1b4d3e] font-bold' : 'hover:text-white'}`}
+            className={`px-2 py-1 rounded cursor-pointer ${currentView === 'mongo_compass' ? 'bg-white text-[#1b4d3e] font-bold' : 'text-[#c6e4d6]'}`}
           >
-            🍃 {isHi ? 'कम्पास डेटा' : 'Compass'}
+            🍃 {isHi ? 'डेटा' : 'Data'}
           </button>
         </div>
-        <div className="text-[10px] text-[#86c4a8]">
-          {isMandiActive ? (isHi ? 'मंडी मोड' : 'Operator Mode') : isAdminActive ? (isHi ? 'एडमिन मोड' : 'Admin Mode') : (isHi ? 'किसान पोर्टल' : 'Farmer Portal')}
-        </div>
-      </div>
+      )}
     </header>
   );
 };
-
