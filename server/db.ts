@@ -9,6 +9,7 @@ import {
   GodownStock,
   CropPreCheckResult 
 } from '../src/types.js';
+import { dispatchRealNotification } from './services/notificationService.js';
 
 // In-Memory & Persistent MongoDB-compatible collection store
 class MongoCollection<T extends { id: string }> {
@@ -217,7 +218,8 @@ export const initialStages: ProcurementStage[] = [
     titleEn: 'Mandi Gate Entry',
     subHi: 'सम्पन्न • 10:45 AM',
     subEn: 'Pass • 10:45 AM',
-    status: 'completed',
+    // status: 'completed',
+    status: 'in_progress',
     time: '10:45 AM',
     details: 'RFID गेट #01 स्कैन व यार्ड मार्शल सत्यापन',
     iconType: 'gate'
@@ -229,7 +231,8 @@ export const initialStages: ProcurementStage[] = [
     titleEn: 'Quality & Moisture Test',
     subHi: 'नमी: 11.4% (मानक योग्य पास)',
     subEn: 'Moisture: 11.4% (Pass Standard)',
-    status: 'in_progress',
+    // status: 'in_progress',
+      status: 'upcoming',
     time: 'प्रगति पर (11:12 AM)',
     details: 'डिजिटल नमी मापक #03 द्वारा परीक्षण जारी',
     iconType: 'quality'
@@ -380,3 +383,720 @@ export const db = {
   godownStocks: new MongoCollection<GodownStock>('godown_stocks', initialGodownStocks),
   cropChecks: new MongoCollection<CropPreCheckResult>('crop_prechecks', [])
 };
+
+export interface RegisterFarmerInput {
+  nameHi: string;
+  nameEn?: string;
+  phone: string;
+  pin?: string;
+  aadhaar: string;
+  samagraId: string;
+  village: string;
+  district: string;
+  totalLandAcres: number;
+  registeredCrop: string;
+  registeredQuantityLimit: number;
+  mandiCenterName: string;
+  slotDate: string;
+  slotTime: string;
+  vehicleNumber: string;
+  vehicleType: string;
+  khasraNumber?: string;
+  bankName?: string;
+  bankAccount?: string;
+  ifscCode?: string;
+}
+
+export function getCropMsp(cropName?: string): number {
+  if (!cropName) return 2400;
+  if (cropName.includes('चना')) return 5440;
+  if (cropName.includes('सरसों') || cropName.includes('राई')) return 5650;
+  if (cropName.includes('सोयाबीन')) return 4892;
+  if (cropName.includes('धान')) return 2300;
+  return 2400; // Wheat default
+}
+
+export let activeFarmerId = 'farmer_001';
+export let activeSlotId = 'slot_active';
+export let dbtPaymentStatus: 'pending' | 'in_progress' | 'credit_successful' = 'in_progress';
+export let dbtUtrNumber: string = '';
+
+export interface FarmerQueueItem {
+  id: string;
+  farmerId: string;
+  token: string;
+  farmerName: string;
+  phone: string;
+  vehicleNo: string;
+  crop: string;
+  quantity: number;
+  mandiName: string;
+  arrivalTime: string;
+  stage: string;
+  stageType: 'gate_wait' | 'quality' | 'weighment' | 'unloading' | 'ready';
+  currentScale?: string;
+  actionType: 'gate_call' | 'call_scale' | 'record_weight' | 'slip_recommend' | 'completed';
+  actionLabel: string;
+}
+
+export interface YardDirective {
+  id: string;
+  farmerId: string;
+  farmerName: string;
+  token: string;
+  textHi: string;
+  textEn: string;
+  scaleNumber?: string;
+  time: string;
+  action: string;
+}
+
+export interface AppNotification {
+  id: string;
+  farmerId: string;
+  farmerName: string;
+  phone: string;
+  type: 'whatsapp' | 'sms';
+  sender: string;
+  title: string;
+  message: string;
+  timestamp: string;
+}
+
+export let operatorQueueList: FarmerQueueItem[] = [];
+export let latestDirective: YardDirective | null = null;
+export let notificationsLog: AppNotification[] = [];
+
+export function getQueueList(): FarmerQueueItem[] {
+  return operatorQueueList;
+}
+
+export function getDirective(): YardDirective | null {
+  return latestDirective;
+}
+
+export function getNotificationsList(): AppNotification[] {
+  return notificationsLog;
+}
+
+export async function getActiveFarmer(): Promise<FarmerProfile | null> {
+  return (await db.farmers.findById(activeFarmerId)) || (await db.farmers.findById('farmer_001'));
+}
+
+export async function getActiveSlot(): Promise<MandiSlot | null> {
+  return (await db.slots.findById(activeSlotId)) || (await db.slots.findById('slot_active')) || (await db.slots.findOne());
+}
+
+export async function registerFarmerData(input: any) {
+  const farmerId = 'MP-' + Math.floor(10000 + Math.random() * 90000);
+  const tokenNumber = 'MP-' + Math.floor(1000 + Math.random() * 9000);
+  const cropStr = String(input.registeredCrop || input.crop || 'गेहूँ (Wheat MP-Sharbati)');
+  const mspRate = getCropMsp(cropStr);
+  const qty = Number(input.registeredQuantityLimit || input.quantity) || 45;
+  const bonus = cropStr.includes('गेहूँ') ? 125 : 0;
+  const totalVal = qty * (mspRate + bonus);
+
+  const nameHi = input.nameHi || input.name || 'किसान भाई';
+  const nameEn = input.nameEn || (input.name && !input.nameHi ? input.name : nameHi);
+  const phone = String(input.phone || input.mobile || '9876543210');
+  const aadhaarRaw = String(input.aadhaar || '123456789012');
+  const aadhaarMasked = aadhaarRaw.length >= 4 ? `XXXX-XXXX-${aadhaarRaw.slice(-4)}` : aadhaarRaw;
+
+  const farmer: FarmerProfile = {
+    id: farmerId,
+    nameHi,
+    nameEn,
+    phone,
+    aadhaarMasked,
+    samagraId: input.samagraId || '48921008',
+    village: input.village || 'धर्मराजपुरा, सांवेर',
+    district: input.district || 'इन्दौर (मध्य प्रदेश)',
+    totalLandAcres: Number(input.totalLandAcres || input.landArea) || 5,
+    registeredCrop: cropStr,
+    registeredQuantityLimit: qty,
+    isKycVerified: true,
+    isBhulekhSynced: true,
+    isNpciSeeded: true
+  };
+
+  const slot: MandiSlot = {
+    id: 'slot_' + farmerId,
+    tokenNumber,
+    farmerId: farmer.id,
+    farmerName: farmer.nameHi,
+    date: input.slotDate || input.date || '26 अक्टूबर 2025',
+    timeSlot: input.slotTime || input.timeSlot || '11:00 AM – 12:30 PM',
+    gateArrivalExpected: (input.slotTime || input.timeSlot) ? (input.slotTime || input.timeSlot).split('–')[0]?.trim() : '10:45 AM',
+    mandiCenterName: input.mandiCenterName || input.mandi || 'सांवेर उपार्जन केंद्र',
+    gateNumber: 'गेट क्र. 02',
+    laneNumber: 'लेन #02 (ट्रॉली लेन)',
+    cropName: cropStr,
+    cropGrade: 'ग्रेड-A',
+    quantityQuintal: qty,
+    mspRatePerQuintal: mspRate,
+    totalEstimatedValue: totalVal,
+    vehicleNumber: input.vehicleNumber || input.vehicleNo || 'MP-09-GE-4102',
+    vehicleType: input.vehicleType || 'ट्रैक्टर ट्रॉली',
+    status: 'confirmed',
+    bookingTimestamp: new Date().toISOString(),
+    qrCodeData: `ANNDWAR|${tokenNumber}|${farmer.id}|${cropStr}|${qty}Q|${input.mandiCenterName || input.mandi || 'सांवेर उपार्जन केंद्र'}`
+  };
+
+  const docs: DocumentItem[] = [
+    {
+      id: 'doc_1',
+      titleHi: 'आधार कार्ड (Aadhaar Card)',
+      titleEn: 'Aadhaar Card',
+      subtitleHi: input.aadhaarDocName ? `अपलोड: ${input.aadhaarDocName}` : 'UIDAI e-KYC ओटीपी मान्य',
+      subtitleEn: input.aadhaarDocName ? `Uploaded: ${input.aadhaarDocName}` : 'UIDAI e-KYC OTP Validated',
+      statusTextHi: 'सत्यापित',
+      statusTextEn: 'Verified',
+      isVerified: true,
+      docNumber: farmer.aadhaarMasked,
+      iconType: 'aadhaar'
+    },
+    {
+      id: 'doc_2',
+      titleHi: 'भू-अभिलेख खसरा / खतौनी',
+      titleEn: 'Land Record Khasra / Khatauni',
+      subtitleHi: input.khasraDocName ? `अपलोड: ${input.khasraDocName}` : 'MP Bhulekh डेटा सिंक OK',
+      subtitleEn: input.khasraDocName ? `Uploaded: ${input.khasraDocName}` : 'MP Bhulekh Data Sync OK',
+      statusTextHi: 'सिंक पूर्ण',
+      statusTextEn: 'Sync Complete',
+      isVerified: true,
+      docNumber: input.khasraNumber ? `खसरा क्र: ${input.khasraNumber} (रकबा ${input.totalLandAcres || 5} एकड़)` : `खसरा क्र: 124/2, 125/1 (रकबा ${input.totalLandAcres || 5} एकड़)`,
+      iconType: 'bhulekh'
+    },
+    {
+      id: 'doc_3',
+      titleHi: 'बैंक पासबुक / निरस्त चेक',
+      titleEn: 'Bank Passbook / Cancelled Cheque',
+      subtitleHi: input.bankDocName ? `अपलोड: ${input.bankDocName}` : 'NPCI Seeding OK',
+      subtitleEn: input.bankDocName ? `Uploaded: ${input.bankDocName}` : 'NPCI Seeding OK',
+      statusTextHi: 'आधार लिंक सक्रिय',
+      statusTextEn: 'Aadhaar Linked Active',
+      isVerified: true,
+      docNumber: `${input.bankName || 'SBI'} A/c: *******${input.bankAccount ? String(input.bankAccount).slice(-4) : '4921'} (IFSC: ${input.ifscCode || 'SBIN000124'})`,
+      iconType: 'bank'
+    },
+    {
+      id: 'doc_4',
+      titleHi: 'समग्र परिवार आईडी (Samagra)',
+      titleEn: 'Samagra Family ID',
+      subtitleHi: input.samagraDocName ? `अपलोड: ${input.samagraDocName}` : `सदस्य आईडी: ${input.samagraId || '48921008'}`,
+      subtitleEn: input.samagraDocName ? `Uploaded: ${input.samagraDocName}` : `Member ID: ${input.samagraId || '48921008'}`,
+      statusTextHi: 'प्रमाणित',
+      statusTextEn: 'Certified',
+      isVerified: true,
+      docNumber: input.samagraId || '48921008',
+      iconType: 'samagra'
+    }
+  ];
+
+  const stages: ProcurementStage[] = [
+    {
+      id: 'stage_1',
+      step: 1,
+      titleHi: 'किसान सत्यापन',
+      titleEn: 'Farmer Verification',
+      subHi: 'पूर्ण (सत्यापित)',
+      subEn: 'Completed (Approved)',
+      status: 'completed',
+      time: '08:30 AM',
+      details: 'पोर्टल द्वारा स्वीकृत एवं भू-अभिलेख सत्यापित',
+      iconType: 'farmer'
+    },
+    {
+      id: 'stage_2',
+      step: 2,
+      titleHi: 'स्लॉट बुकिंग',
+      titleEn: 'Slot Booking',
+      subHi: `सत्यापित (#${tokenNumber})`,
+      subEn: `Verified (#${tokenNumber})`,
+      status: 'completed',
+      time: slot.timeSlot,
+      details: `${slot.mandiCenterName} - ${slot.gateNumber}`,
+      iconType: 'slot'
+    },
+    {
+      id: 'stage_3',
+      step: 3,
+      titleHi: 'मंडी गेट प्रवेश',
+      titleEn: 'Mandi Gate Entry',
+      subHi: 'प्रवेश प्रतीक्षारत',
+      subEn: 'Awaiting Gate Arrival',
+      status: 'in_progress',
+      time: slot.gateArrivalExpected,
+      details: `RFID गेट स्कैन व यार्ड आगमन - वाहन: ${slot.vehicleNumber}`,
+      iconType: 'gate'
+    },
+    {
+      id: 'stage_4',
+      step: 4,
+      titleHi: 'गुणवत्ता व नमी जांच',
+      titleEn: 'Quality & Moisture Test',
+      subHi: 'प्रतीक्षारत',
+      subEn: 'Pending Inspection',
+      status: 'upcoming',
+      time: 'गेट पश्चात',
+      details: `${slot.cropName} नमी मापक व गुणवत्ता ग्रेडिंग`,
+      iconType: 'quality'
+    },
+    {
+      id: 'stage_5',
+      step: 5,
+      titleHi: 'इलेक्ट्रॉनिक तौल',
+      titleEn: 'Electronic Weighment',
+      subHi: 'प्रतीक्षारत',
+      subEn: 'Pending Weighment',
+      status: 'upcoming',
+      time: 'प्रतीक्षारत',
+      details: `सकल एवं शुद्ध तौल (अनुमानित ${qty} क्विंटल)`,
+      iconType: 'weigh'
+    },
+    {
+      id: 'stage_6',
+      step: 6,
+      titleHi: 'ई-उपार्जन पावती',
+      titleEn: 'Digital MSP Slip',
+      subHi: 'तौल उपरांत तैयार',
+      subEn: 'Ready Post Weighment',
+      status: 'upcoming',
+      time: 'प्रतीक्षारत',
+      details: 'डिजिटल रसीद व SMS प्रेषण',
+      iconType: 'receipt'
+    },
+    {
+      id: 'stage_7',
+      step: 7,
+      titleHi: 'DBT बैंक भुगतान',
+      titleEn: 'Direct Benefit Transfer',
+      subHi: 'आधार लिंक्ड बैंक खाता',
+      subEn: 'Direct to Bank Account',
+      status: 'upcoming',
+      time: '24-48 कार्य घंटे',
+      details: 'ट्रेजरी व APB गेटवे द्वारा प्रत्यक्ष अंतरण',
+      iconType: 'dbt'
+    }
+  ];
+
+  const payment: PaymentRecord = {
+    id: 'pay_' + farmerId,
+    cropNameHi: `${cropStr} उपार्जन (${qty} क्विंटल)`,
+    cropNameEn: `${cropStr} Procurement (${qty} Quintal)`,
+    quantityQuintal: qty,
+    totalAmount: totalVal,
+    date: input.slotDate || input.date || '26 अक्टूबर 2025',
+    seasonHi: 'रबी विपणन 2025-26',
+    seasonEn: 'Rabi Marketing 2025-26',
+    status: 'in_progress',
+    utrNumber: '',
+    mandiName: input.mandiCenterName || input.mandi || 'सांवेर उपार्जन केंद्र',
+    receiptNumber: `RCP-2025-${tokenNumber}`
+  };
+
+  // Save to in-memory collections
+  await db.farmers.create(farmer);
+  await db.slots.create(slot);
+
+  // Clear previous docs/stages and insert fresh ones
+  const existingDocs = await db.documents.find();
+  for (const ed of existingDocs) {
+    await db.documents.deleteOne(ed.id);
+  }
+  for (const d of docs) {
+    await db.documents.create(d);
+  }
+
+  const existingStages = await db.stages.find();
+  for (const es of existingStages) {
+    await db.stages.deleteOne(es.id);
+  }
+  for (const s of stages) {
+    await db.stages.create(s);
+  }
+
+  await db.payments.create(payment);
+
+  activeFarmerId = farmer.id;
+  activeSlotId = slot.id;
+  dbtPaymentStatus = 'in_progress';
+  dbtUtrNumber = '';
+
+  const timeStr = new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' });
+
+  // Record newly registered farmer in Mandi Operator's live queue (NO DUMMY NAMES)
+  const queueItem: FarmerQueueItem = {
+    id: 'q_' + farmer.id,
+    farmerId: farmer.id,
+    token: `#${tokenNumber}`,
+    farmerName: farmer.nameHi,
+    phone: farmer.phone,
+    vehicleNo: slot.vehicleNumber,
+    crop: `${slot.cropName} (${slot.quantityQuintal} Qt)`,
+    quantity: slot.quantityQuintal,
+    mandiName: slot.mandiCenterName,
+    arrivalTime: timeStr,
+    stage: 'गेट प्रतीक्षारत',
+    stageType: 'gate_wait',
+    currentScale: 'कांटा क्र. 02',
+    actionType: 'gate_call',
+    actionLabel: '🚪 गेट आगमन दर्ज',
+  };
+  operatorQueueList = [queueItem, ...operatorQueueList.filter(it => it.farmerId !== farmer.id)];
+
+  // Set initial Live Directive for the farmer dashboard
+  latestDirective = {
+    id: 'dir_' + Date.now(),
+    farmerId: farmer.id,
+    farmerName: farmer.nameHi,
+    token: `#${tokenNumber}`,
+    textHi: `टोकन #${tokenNumber}: स्लॉट पुष्ट हुआ! कृपया निर्धारित समय (${slot.timeSlot}) पर ${slot.mandiCenterName} के गेट क्र. 02 पर पहुंचें।`,
+    textEn: `Token #${tokenNumber}: Slot confirmed! Please reach Gate #02 of ${slot.mandiCenterName} at ${slot.timeSlot}.`,
+    scaleNumber: 'गेट क्र. 02',
+    time: timeStr,
+    action: 'slot_confirmed'
+  };
+
+  // Dispatch Registration WhatsApp & SMS Messages to registered mobile
+  const waReg: AppNotification = {
+    id: 'notif_wa_' + Date.now(),
+    farmerId: farmer.id,
+    farmerName: farmer.nameHi,
+    phone: farmer.phone,
+    type: 'whatsapp',
+    sender: 'AnnaDwar - Kisan se Desh Tak',
+    title: '🌾 AnnaDwar: स्लॉट बुकिंग पुष्टि',
+    message: `नमस्ते ${farmer.nameHi}, आपका उपार्जन स्लॉट टोकन #${tokenNumber} (${slot.cropName}, ${qty} क्विंटल) हेतु ${slot.mandiCenterName} में ${slot.date} (${slot.timeSlot}) के लिए सफलतापूर्वक पुष्ट हो गया है। गेट क्र. 02 पर QR पास दिखाएं। - AnnaDwar: Kisan se Desh Tak`,
+    timestamp: timeStr
+  };
+
+  const smsReg: AppNotification = {
+    id: 'notif_sms_' + (Date.now() + 1),
+    farmerId: farmer.id,
+    farmerName: farmer.nameHi,
+    phone: farmer.phone,
+    type: 'sms',
+    sender: 'VM-ANNDWR',
+    title: 'SMS अलर्ट: AnnaDwar स्लॉट टोकन',
+    message: `VM-ANNDWR: प्रिय ${farmer.nameHi}, AnnaDwar में टोकन #${tokenNumber} जारी हुआ। केंद्र: ${slot.mandiCenterName}, समय: ${slot.timeSlot}, वाहन: ${slot.vehicleNumber}। - AnnaDwar (किसान से देश तक)`,
+    timestamp: timeStr
+  };
+
+  notificationsLog = [waReg, smsReg, ...notificationsLog];
+  dispatchRealNotification(farmer.phone, waReg.message, waReg.title).catch(err => console.error('Dispatch error:', err));
+
+  return {
+    farmer,
+    slot,
+    documents: docs,
+    stages,
+    payment
+  };
+}
+
+export async function updateOperatorAction(token: string, actionType: string, customScale?: string) {
+  let targetToken = (token || '').trim();
+  if (targetToken.startsWith('#')) targetToken = targetToken.slice(1);
+  const item = operatorQueueList.find(it => it.token === `#${targetToken}` || it.token === targetToken || (targetToken && it.token.includes(targetToken))) || operatorQueueList[0];
+  const cleanToken = item?.token || (targetToken && targetToken !== 'undefined' ? `#${targetToken}` : '#MP-88210');
+  const farmerName = item?.farmerName || 'किसान भाई';
+  const phone = item?.phone || '9826199999';
+  const timeStr = new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' });
+  const scale = customScale || 'कांटा क्र. 02';
+
+  if (actionType === 'gate_call' || actionType === 'gate_entry') {
+    if (item) {
+      item.stage = '✓ गेट आगमन दर्ज';
+      item.stageType = 'quality';
+      item.actionType = 'call_scale';
+      item.actionLabel = 'कांटा पर बुलाएं';
+    }
+    await updateStageStatus(3, 'completed', { subHi: `प्रवेश सम्पन्न • ${timeStr}` });
+    await updateStageStatus(4, 'in_progress', { subHi: 'नमी परीक्षण चालू' });
+
+    latestDirective = {
+      id: 'dir_' + Date.now(),
+      farmerId: item?.farmerId || activeFarmerId,
+      farmerName,
+      token: cleanToken,
+      textHi: `🔔 गेट आगमन स्वीकृत! टोकन ${cleanToken} (${farmerName}) - वाहन यार्ड परिसर में प्रविष्ट हुआ। कृपया नमूना जांच हेतु नमी लैब पर उपस्थित रहें।`,
+      textEn: `Gate arrival approved! Token ${cleanToken} (${farmerName}) - Vehicle entered yard. Please report to Moisture Lab.`,
+      scaleNumber: 'गेट क्र. 02',
+      time: timeStr,
+      action: 'gate_entry'
+    };
+
+    notificationsLog.unshift(
+      {
+        id: 'wa_' + Date.now(),
+        farmerId: item?.farmerId || activeFarmerId,
+        farmerName,
+        phone,
+        type: 'whatsapp',
+        sender: 'AnnaDwar - Kisan se Desh Tak',
+        title: '🌾 गेट प्रवेश पुष्टि',
+        message: `🌾 AnnaDwar - Kisan se Desh Tak: नमस्ते ${farmerName}, आपका टोकन ${cleanToken} गेट क्र. 02 पर प्रविष्ट हो चुका है। कृपया वाहन को नमी परीक्षण काउंटर / लैब की ओर ले जाएं।`,
+        timestamp: timeStr
+      },
+      {
+        id: 'sms_' + (Date.now() + 1),
+        farmerId: item?.farmerId || activeFarmerId,
+        farmerName,
+        phone,
+        type: 'sms',
+        sender: 'VM-ANNDWR',
+        title: 'SMS: गेट प्रवेश सम्पन्न',
+        message: `VM-ANNDWR: AnnaDwar - टोकन ${cleanToken} गेट प्रवेश सम्पन्न। नमूना जांच हेतु वाहन लैब पर लाएं। - AnnaDwar (किसान से देश तक)`,
+        timestamp: timeStr
+      }
+    );
+    dispatchRealNotification(phone, `🌾 AnnaDwar - Kisan se Desh Tak: नमस्ते ${farmerName}, आपका टोकन ${cleanToken} गेट क्र. 02 पर प्रविष्ट हो चुका है। कृपया वाहन को नमी परीक्षण काउंटर / लैब की ओर ले जाएं।`, '🌾 गेट प्रवेश पुष्टि').catch(console.error);
+  } else if (actionType === 'call_scale') {
+    if (item) {
+      item.stage = `✓ ${scale} पर आमंत्रित`;
+      item.stageType = 'weighment';
+      item.currentScale = scale;
+      item.actionType = 'record_weight';
+      item.actionLabel = 'वजन रिकॉर्ड';
+    }
+    await updateStageStatus(4, 'completed', { subHi: 'नमी 11.2% (मानक पास ✓)' });
+    await updateStageStatus(5, 'in_progress', { subHi: `${scale} पर तौल चालू` });
+
+    latestDirective = {
+      id: 'dir_' + Date.now(),
+      farmerId: item?.farmerId || activeFarmerId,
+      farmerName,
+      token: cleanToken,
+      textHi: `🚨 तत्काल निर्देश: टोकन ${cleanToken} (${farmerName}) - कृपया तुरंत अपना वाहन ${scale} पर ले जाएं। तौल हेतु आपका नंबर आ गया है!`,
+      textEn: `Urgent Directive: Token ${cleanToken} (${farmerName}) - Please move your vehicle to ${scale} immediately. It is your turn for weighment!`,
+      scaleNumber: scale,
+      time: timeStr,
+      action: 'call_scale'
+    };
+
+    notificationsLog.unshift(
+      {
+        id: 'wa_' + Date.now(),
+        farmerId: item?.farmerId || activeFarmerId,
+        farmerName,
+        phone,
+        type: 'whatsapp',
+        sender: 'AnnaDwar - Kisan se Desh Tak',
+        title: '🚨 धर्मकांटा बुलावा अलर्ट',
+        message: `🚨 AnnaDwar - Kisan se Desh Tak: आवश्यक सूचना! ${farmerName}, आपका टोकन ${cleanToken} ${scale} पर आमंत्रित किया गया है। कृपया बिना विलंब अपना वाहन ${scale} पर लाएं।`,
+        timestamp: timeStr
+      },
+      {
+        id: 'sms_' + (Date.now() + 1),
+        farmerId: item?.farmerId || activeFarmerId,
+        farmerName,
+        phone,
+        type: 'sms',
+        sender: 'VM-ANNDWR',
+        title: 'SMS: धर्मकांटा बुलावा',
+        message: `VM-ANNDWR: AnnaDwar - टोकन ${cleanToken} ${scale} पर तुरंत पहुंचें। आपका तौल चालू हो रहा है। - AnnaDwar (किसान से देश तक)`,
+        timestamp: timeStr
+      }
+    );
+    dispatchRealNotification(phone, `🚨 AnnaDwar - Kisan se Desh Tak: आवश्यक सूचना! ${farmerName}, आपका टोकन ${cleanToken} ${scale} पर आमंत्रित किया गया है। कृपया बिना विलंब अपना वाहन ${scale} पर लाएं।`, '🚨 धर्मकांटा बुलावा अलर्ट').catch(console.error);
+  } else if (actionType === 'record_weight') {
+    if (item) {
+      item.stage = 'वेयरहाउस अनलोडिंग';
+      item.stageType = 'unloading';
+      item.actionType = 'slip_recommend';
+      item.actionLabel = 'पर्ची संस्तुति';
+    }
+    await updateStageStatus(5, 'completed', { subHi: 'शुद्ध तौल दर्ज ✓' });
+    await updateStageStatus(6, 'in_progress', { subHi: 'ई-पावती तैयार की जा रही है' });
+
+    latestDirective = {
+      id: 'dir_' + Date.now(),
+      farmerId: item?.farmerId || activeFarmerId,
+      farmerName,
+      token: cleanToken,
+      textHi: `⚖️ तौल दर्ज: टोकन ${cleanToken} (${farmerName}) - सकल एवं शुद्ध वजन सफलतापूर्वक दर्ज हुआ! कृपया अनलोडिंग उपरांत पावती काउंटर पर संपर्क करें।`,
+      textEn: `Weighment recorded for Token ${cleanToken} (${farmerName})! Gross and net weight verified.`,
+      scaleNumber: scale,
+      time: timeStr,
+      action: 'record_weight'
+    };
+
+    notificationsLog.unshift(
+      {
+        id: 'wa_' + Date.now(),
+        farmerId: item?.farmerId || activeFarmerId,
+        farmerName,
+        phone,
+        type: 'whatsapp',
+        sender: 'AnnaDwar - Kisan se Desh Tak',
+        title: '⚖️ तौल वजन दर्ज',
+        message: `🌾 AnnaDwar - Kisan se Desh Tak: ${farmerName}, आपके टोकन ${cleanToken} का शुद्ध वजन सफलतापूर्वक दर्ज कर लिया गया है। ई-उपार्जन पावती तैयार हो रही है।`,
+        timestamp: timeStr
+      },
+      {
+        id: 'sms_' + (Date.now() + 1),
+        farmerId: item?.farmerId || activeFarmerId,
+        farmerName,
+        phone,
+        type: 'sms',
+        sender: 'VM-ANNDWR',
+        title: 'SMS: तौल वजन दर्ज',
+        message: `VM-ANNDWR: AnnaDwar - टोकन ${cleanToken} का वजन धर्मकांटा पर दर्ज हुआ। पावती जनरेट हो रही है। - AnnaDwar (किसान से देश तक)`,
+        timestamp: timeStr
+      }
+    );
+    dispatchRealNotification(phone, `🌾 AnnaDwar - Kisan se Desh Tak: ${farmerName}, आपके टोकन ${cleanToken} का शुद्ध वजन सफलतापूर्वक दर्ज कर लिया गया है। ई-उपार्जन पावती तैयार हो रही है।`, '⚖️ तौल वजन दर्ज').catch(console.error);
+  } else if (actionType === 'slip_recommend') {
+    if (item) {
+      item.stage = 'पावती जारी (Ready)';
+      item.stageType = 'ready';
+      item.actionType = 'completed';
+      item.actionLabel = '✓ पूर्ण';
+    }
+    await updateStageStatus(6, 'completed', { subHi: 'डिजिटल पावती निर्गत ✓' });
+    await updateStageStatus(7, 'in_progress', { subHi: 'ट्रेजरी व APB क्लीयरेंस' });
+
+    latestDirective = {
+      id: 'dir_' + Date.now(),
+      farmerId: item?.farmerId || activeFarmerId,
+      farmerName,
+      token: cleanToken,
+      textHi: `📜 पावती निर्गत: टोकन ${cleanToken} (${farmerName}) - डिजिटल पावती जारी हो चुकी है। DBT बैंक खाता अंतरण प्रक्रिया प्रारंभ कर दी गई है।`,
+      textEn: `Receipt issued for Token ${cleanToken} (${farmerName}). DBT Payment pipeline initiated.`,
+      scaleNumber: 'काउंटर #01',
+      time: timeStr,
+      action: 'slip_issued'
+    };
+
+    notificationsLog.unshift(
+      {
+        id: 'wa_' + Date.now(),
+        farmerId: item?.farmerId || activeFarmerId,
+        farmerName,
+        phone,
+        type: 'whatsapp',
+        sender: 'AnnaDwar - Kisan se Desh Tak',
+        title: '📜 डिजिटल पावती निर्गत',
+        message: `📜 AnnaDwar - Kisan se Desh Tak: बधाई! ${farmerName}, आपकी आधिकारिक उपार्जन पावती पोर्टल पर उपलब्ध है। DBT बैंक भुगतान प्रक्रियाधीन है।`,
+        timestamp: timeStr
+      },
+      {
+        id: 'sms_' + (Date.now() + 1),
+        farmerId: item?.farmerId || activeFarmerId,
+        farmerName,
+        phone,
+        type: 'sms',
+        sender: 'VM-ANNDWR',
+        title: 'SMS: पावती जारी',
+        message: `VM-ANNDWR: AnnaDwar - टोकन ${cleanToken} की डिजिटल पावती जारी। DBT भुगतान 24-48 घंटे में सीधे बैंक खाते में पहुंचेगा। - AnnaDwar`,
+        timestamp: timeStr
+      }
+    );
+    dispatchRealNotification(phone, `📜 AnnaDwar - Kisan se Desh Tak: बधाई! ${farmerName}, आपकी आधिकारिक उपार्जन पावती पोर्टल पर उपलब्ध है। DBT बैंक भुगतान प्रक्रियाधीन है।`, '📜 डिजिटल पावती निर्गत').catch(console.error);
+  }
+
+  return {
+    queueItem: item,
+    directive: latestDirective,
+    queue: operatorQueueList
+  };
+}
+
+export async function updateStageStatus(stepNumber: number, status: 'completed' | 'in_progress' | 'upcoming', extra?: { subHi?: string; subEn?: string; details?: string }) {
+  const stages = await db.stages.find();
+  stages.sort((a, b) => a.step - b.step);
+
+  for (const st of stages) {
+    if (st.step === stepNumber) {
+      st.status = status;
+      if (extra?.subHi) st.subHi = extra.subHi;
+      if (extra?.subEn) st.subEn = extra.subEn;
+      if (extra?.details) st.details = extra.details;
+      if (status === 'completed' && !extra?.subHi) {
+        st.subHi = 'सम्पन्न ✓';
+      }
+    } else if (st.step < stepNumber && status === 'completed') {
+      st.status = 'completed';
+    }
+    await db.stages.updateOne(st.id, st);
+  }
+
+  // If step 7 is marked completed, update DBT payment status
+  if (stepNumber === 7 && status === 'completed') {
+    dbtPaymentStatus = 'credit_successful';
+    dbtUtrNumber = 'SBIN' + Math.floor(100000000 + Math.random() * 900000000);
+    const activePayment = await db.payments.findById('pay_' + activeFarmerId) || await db.payments.findOne();
+    if (activePayment) {
+      activePayment.status = 'credit_successful';
+      activePayment.utrNumber = dbtUtrNumber;
+      await db.payments.updateOne(activePayment.id, activePayment);
+    }
+  }
+
+  return await db.stages.find();
+}
+
+export async function updateDbtPaymentStatus(status: 'pending' | 'in_progress' | 'credit_successful', utr?: string) {
+  dbtPaymentStatus = status;
+  const timeStr = new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' });
+
+  if (status === 'credit_successful') {
+    dbtUtrNumber = utr || 'SBIN' + Math.floor(100000000 + Math.random() * 900000000);
+    await updateStageStatus(7, 'completed', { subHi: 'भुगतान सफल ✓', details: `UTR: ${dbtUtrNumber}` });
+
+    const activeFarmer = await getActiveFarmer();
+    const farmerName = activeFarmer?.nameHi || 'किसान भाई';
+    const phone = activeFarmer?.phone || '9826199999';
+
+    latestDirective = {
+      id: 'dir_' + Date.now(),
+      farmerId: activeFarmerId,
+      farmerName,
+      token: dbtUtrNumber ? `#${dbtUtrNumber.slice(-4)}` : '#MP-88210',
+      textHi: `💰 DBT भुगतान सफल! PFMS/APB द्वारा राशि किसान के आधार लिंक बैंक खाते में अंतरित कर दी गई है (UTR: ${dbtUtrNumber})।`,
+      textEn: `DBT Payment Successful! Funds credited via PFMS/APB (UTR: ${dbtUtrNumber}).`,
+      time: timeStr,
+      action: 'dbt_credited'
+    };
+
+    notificationsLog.unshift(
+      {
+        id: 'wa_' + Date.now(),
+        farmerId: activeFarmerId,
+        farmerName,
+        phone,
+        type: 'whatsapp',
+        sender: 'AnnaDwar - Kisan se Desh Tak',
+        title: '💰 DBT बैंक भुगतान सफल',
+        message: `💰 AnnaDwar - Kisan se Desh Tak: शुभ समाचार! ${farmerName}, आपके आधार लिंक्ड बैंक खाते में MSP उपार्जन राशि DBT द्वारा अंतरित कर दी गई है (UTR: ${dbtUtrNumber})। - AnnaDwar: किसान से देश तक`,
+        timestamp: timeStr
+      },
+      {
+        id: 'sms_' + (Date.now() + 1),
+        farmerId: activeFarmerId,
+        farmerName,
+        phone,
+        type: 'sms',
+        sender: 'VM-ANNDWR',
+        title: 'SMS: DBT भुगतान सफल',
+        message: `VM-ANNDWR: AnnaDwar - बैंक खाता क्रेडिट सफल! MSP उपार्जन राशि DBT द्वारा UTR ${dbtUtrNumber} से जमा हुई। - किसान से देश तक`,
+        timestamp: timeStr
+      }
+    );
+  } else if (status === 'in_progress') {
+    await updateStageStatus(7, 'in_progress', { subHi: 'प्रक्रियाधीन (ट्रेजरी क्लियरेंस)', details: 'ट्रेजरी व APB गेटवे द्वारा प्रत्यक्ष अंतरण' });
+  } else {
+    await updateStageStatus(7, 'upcoming', { subHi: 'प्रतीक्षारत', details: 'तौल व बिल सत्यापन उपरांत' });
+  }
+
+  const activePayment = await db.payments.findById('pay_' + activeFarmerId) || await db.payments.findOne();
+  if (activePayment) {
+    activePayment.status = status;
+    if (dbtUtrNumber) activePayment.utrNumber = dbtUtrNumber;
+    await db.payments.updateOne(activePayment.id, activePayment);
+  }
+
+  return { dbtPaymentStatus, dbtUtrNumber };
+}
+

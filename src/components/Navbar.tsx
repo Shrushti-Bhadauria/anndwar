@@ -47,8 +47,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">
-                {isHi ? 'अन्नद्वार' : 'Anndwar'}
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-1.5">
+                <span>{isHi ? 'अन्नद्वार' : 'AnnaDwar'}</span>
+                <span className="text-xs font-normal text-emerald-200/90 hidden sm:inline">- {isHi ? 'किसान से देश तक' : 'Kisan se Desh Tak'}</span>
               </h1>
               {role === 'farmer' && (
                 <span className="text-[10px] font-bold bg-[#2a6b54] text-[#d4f3e3] px-2 py-0.5 rounded-full tracking-wider border border-[#3d856b]">
@@ -66,9 +67,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-[10.5px] text-[#b8d6c8] hidden sm:block leading-none mt-0.5">
-              {role === 'farmer' && (isHi ? 'MSP e-उपार्जन, तौल एवं पारदर्शी भुगतान' : 'MSP Procurement & Direct Benefit Transfer')}
-              {role === 'mandi_operator' && (isHi ? 'सांवेर उपार्जन केंद्र • गेट व तौल नियंत्रण' : 'Sanwer Center • Gate & Weighbridge Console')}
+            <p className="text-[10.5px] text-[#b8d6c8] hidden sm:block leading-none mt-0.5 font-medium">
+              {role === 'farmer' && 'AnnaDwar - Kisan se Desh Tak'}
+              {role === 'mandi_operator' && (isHi ? 'सांवेर केंद्र • यार्ड व तौल प्रबंधन' : 'Sanwer Center • Yard & Weighbridge')}
               {role === 'admin' && (isHi ? 'राज्य स्तरीय खाद्यान्न उपार्जन व साइलो प्रबंधन' : 'State Food & Civil Supplies Procurement Command')}
             </p>
           </div>

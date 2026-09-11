@@ -1,4 +1,9 @@
 import {StrictMode} from 'react';
+
+declare module 'react-dom/client' {
+  export function createRoot(container: Element | DocumentFragment): any;
+}
+
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';

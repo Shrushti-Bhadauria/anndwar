@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Printer, Download, QrCode, CheckCircle, Shield, Building2 } from 'lucide-react';
 import { Language, MandiSlot, FarmerProfile } from '../types';
+import { generateQrDataUrl } from '../utils/qrGenerator';
+import { openRealWhatsApp } from '../utils/whatsapp';
 
 interface SlotReceiptModalProps {
   isOpen: boolean;
@@ -19,6 +21,14 @@ export const SlotReceiptModal: React.FC<SlotReceiptModalProps> = ({
 }) => {
   if (!isOpen || !slot) return null;
   const isHi = lang === 'hi';
+  const [qrUrl, setQrUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (slot) {
+      const qrData = slot.qrCodeData || `ANNDWAR|TOKEN:${slot.tokenNumber}|FARMER:${slot.farmerId}|CROP:${slot.cropName}|QTY:${slot.quantityQuintal}Q|MANDI:${slot.mandiCenterName}`;
+      generateQrDataUrl(qrData).then((url) => setQrUrl(url));
+    }
+  }, [slot]);
 
   const handlePrint = () => {
     window.print();
@@ -60,15 +70,14 @@ export const SlotReceiptModal: React.FC<SlotReceiptModalProps> = ({
               <div className="w-10 h-10 rounded-full bg-white p-0.5 border border-[#cfe0d5] flex items-center justify-center overflow-hidden shadow-2xs">
                 <img src="/logo.png" alt="अन्नद्वार" className="w-full h-full object-contain" />
               </div>
-              <h2 className="text-lg sm:text-xl font-black tracking-tight text-[#1b4d3e]">
-                अन्नद्वार • म.प्र. शासन ई-उपार्जन प्रणाली
-              </h2>
-            </div>
-            <p className="text-xs text-[#4f6e5e] font-semibold">
-              खाद्य, नागरिक आपूर्ति एवं उपभोक्ता संरक्षण विभाग • रबी विपणन सत्र 2025-26
-            </p>
-            <div className="inline-block bg-[#edf6f1] text-[#1b4d3e] text-[11px] font-bold px-3 py-0.5 rounded-full border border-[#c4ded0] mt-1.5">
-              गेट प्रवेश ई-टोकन पर्ची (Mandi Yard Entry E-Token)
+              <div className="text-left">
+                <h3 className="font-extrabold text-base text-[#113222] tracking-tight">
+                  {isHi ? 'अन्नद्वार' : 'AnnaDwar'}
+                </h3>
+                <p className="text-[11px] text-[#557766] font-semibold">
+                  {isHi ? 'किसान से देश तक • उपार्जन गेट पास' : 'Kisan se Desh Tak • Procurement Gate Pass'}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -86,9 +95,13 @@ export const SlotReceiptModal: React.FC<SlotReceiptModalProps> = ({
               </span>
             </div>
 
-            <div className="text-center bg-white p-2 border border-[#cbdcd0] rounded-lg shadow-2xs">
-              <QrCode className="w-16 h-16 text-[#1b4d3e]" />
-              <span className="text-[9px] font-mono text-[#618070] block mt-0.5">SCAN AT GATE</span>
+            <div className="text-center bg-white p-1.5 border border-[#cbdcd0] rounded-lg shadow-2xs flex flex-col items-center">
+              {qrUrl ? (
+                <img src={qrUrl} alt="Gate QR" className="w-20 h-20 object-contain" />
+              ) : (
+                <QrCode className="w-16 h-16 text-[#1b4d3e]" />
+              )}
+              <span className="text-[9px] font-mono font-bold text-[#618070] block mt-0.5">SCAN AT GATE</span>
             </div>
           </div>
 
@@ -135,8 +148,8 @@ export const SlotReceiptModal: React.FC<SlotReceiptModalProps> = ({
             <div className="font-mono text-xl sm:text-2xl tracking-[0.25em] font-bold text-[#2a4d3b]">
               ||||| | |||| ||| |||||| |||| |||||
             </div>
-            <span className="text-[9px] text-[#6b8b7a] block mt-0.5">
-              E-UPARJAN TOKEN • ANNDWAR VERIFIED HASH #9821420
+            <span className="text-[9px] text-[#6b8b7a] block mt-0.5 font-bold tracking-wider">
+              ANNADWAR TOKEN • KISAN SE DESH TAK • VERIFIED HASH #9821420
             </span>
           </div>
         </div>
@@ -146,7 +159,18 @@ export const SlotReceiptModal: React.FC<SlotReceiptModalProps> = ({
           <span className="text-xs text-[#527764]">
             {isHi ? 'हेल्पलाइन: 1800-180-1551' : 'Toll-Free: 1800-180-1551'}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => {
+                const receiptMsg = `🌾 AnnaDwar - Kisan se Desh Tak 🌾\n\nनमस्ते ${farmer?.nameHi || 'किसान भाई'}, आपका उपार्जन स्लॉट सफलता पूर्वक बुक हुआ है!\n\n📋 टोकन सं.: ${slot.tokenNumber}\n📍 उपार्जन केंद्र: ${slot.mandiCenterName}\n🚪 गेट: ${slot.gateNumber} (${slot.laneNumber})\n📅 तिथि व समय: ${slot.date} (${slot.timeSlot})\n🌾 फसल: ${slot.cropName} (${slot.quantityQuintal} क्विंटल)\n🚜 वाहन: ${slot.vehicleNumber}\n\nकृपया 15 मिनट पूर्व पहुंचें। टोल-फ्री हेल्पलाइन: 1800-180-1551।`;
+                openRealWhatsApp(farmer?.phone || '9826199999', receiptMsg);
+              }}
+              className="bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title={isHi ? 'व्हाट्सएप पर पावती भेजें' : 'Send receipt via WhatsApp'}
+            >
+              <span>📲</span>
+              <span>{isHi ? 'व्हाट्सएप पर भेजें' : 'Send via WhatsApp'}</span>
+            </button>
             <button
               onClick={handlePrint}
               className="bg-[#1b4d3e] hover:bg-[#153f33] text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"

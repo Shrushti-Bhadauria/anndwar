@@ -12,14 +12,27 @@ import {
   Eye, 
   EyeOff, 
   Sparkles,
-  HelpCircle
+  UserPlus,
+  LogIn,
+  FileText,
+  Calendar,
+  Truck,
+  CreditCard,
+  Scale,
+  Upload,
+  KeyRound,
+  Check,
+  MapPin,
+  Clock
 } from 'lucide-react';
-import { Language, UserRole, AuthUser } from '../types';
+import { Language, UserRole, AuthUser, FarmerProfile, MandiSlot } from '../types';
+import { transliterateToHindi } from '../utils/transliterateHindi';
+import { openRealWhatsApp } from '../utils/whatsapp';
 
 interface LoginViewProps {
   lang: Language;
   onToggleLang: () => void;
-  onLoginSuccess: (user: AuthUser) => void;
+  onLoginSuccess: (user: AuthUser, extraData?: { farmer?: FarmerProfile; slot?: MandiSlot }) => void;
   onOpenWhatsAppHelp?: () => void;
 }
 
@@ -30,12 +43,58 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onOpenWhatsAppHelp,
 }) => {
   const isHi = lang === 'hi';
+  
+  // Top-Level Role Selection: 'farmer' | 'mandi_operator' | 'admin'
   const [selectedRole, setSelectedRole] = useState<UserRole>('farmer');
+  
+  // Mode for Farmer: 'register' (New Registration) or 'login' (Existing Login)
+  const [authMode, setAuthMode] = useState<'register' | 'login'>('register');
+  
+  // Login State
   const [identifier, setIdentifier] = useState('MP-88210');
   const [password, setPassword] = useState('1234');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // New Registration Form State (Dynamic Data Collection)
+  const [regFarmerId, setRegFarmerId] = useState('MP-88210');
+  const [regNameEn, setRegNameEn] = useState('Ramesh Patel');
+  const [regNameHi, setRegNameHi] = useState('रमेश पटेल');
+  const [regPhone, setRegPhone] = useState('9826199999');
+  const [regPin, setRegPin] = useState('1234');
+  const [regAadhaar, setRegAadhaar] = useState('9821-4412-8890');
+  const [regSamagra, setRegSamagra] = useState('48921008');
+  const [regVillage, setRegVillage] = useState('धर्मराजपुरा, सांवेर');
+  const [regDistrict, setRegDistrict] = useState('इन्दौर (मध्य प्रदेश)');
+  const [regLandAcres, setRegLandAcres] = useState<number>(6.5);
+
+  // OTP Verification Simulation
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [isOtpVerified, setIsOtpVerified] = useState(true); // Default verified for smooth demo
+  const [otpBanner, setOtpBanner] = useState('');
+
+  // Dedicated Step 2: Slot Selection & Document Uploads
+  const [regCrop, setRegCrop] = useState('शरबती गेहूँ (ग्रेड-A)');
+  const [regQuantity, setRegQuantity] = useState<number>(55);
+  const [regMandi, setRegMandi] = useState('सांवेर उपार्जन केंद्र');
+  const [regDate, setRegDate] = useState('27 अक्टूबर 2025');
+  const [regTime, setRegTime] = useState('11:00 AM – 12:30 PM');
+  const [regVehicleNo, setRegVehicleNo] = useState('MP-09-EA-5542');
+  const [regVehicleType, setRegVehicleType] = useState('ट्रैक्टर ट्रॉली');
+
+  // Documents & Banking Details
+  const [regKhasra, setRegKhasra] = useState('124/2, 125/1');
+  const [regBankName, setRegBankName] = useState('State Bank of India (SBI)');
+  const [regBankAccount, setRegBankAccount] = useState('38921004821');
+  const [regIfsc, setRegIfsc] = useState('SBIN000124');
+
+  // Document Upload File Names
+  const [docAadhaarName, setDocAadhaarName] = useState('aadhaar_card_scan.pdf');
+  const [docKhasraName, setDocKhasraName] = useState('khasra_nakal_124_2.pdf');
+  const [docBankName, setDocBankName] = useState('sbi_passbook_front.jpg');
+  const [docSamagraName, setDocSamagraName] = useState('samagra_family_id.pdf');
 
   // Valid credential databases for simulation
   const validCredentials: Record<UserRole, {
@@ -44,7 +103,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     user: AuthUser;
   }> = {
     farmer: {
-      validIds: ['MP-88210', '9826100001', 'ramsingh', 'kisan', '88210'],
+      validIds: ['MP-88210', '9826100001', 'ramsingh', 'kisan', '88210', '9826199999'],
       validPins: ['1234', 'kisan123', 'pass123'],
       user: {
         id: 'MP-88210',
@@ -93,12 +152,47 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Phonetic English-to-Hindi Name input handler
+  const handleEnglishNameChange = (val: string) => {
+    setRegNameEn(val);
+    const converted = transliterateToHindi(val);
+    setRegNameHi(converted);
+  };
+
+  // Trigger OTP Simulation
+  const handleSendOtp = () => {
+    setOtpSent(true);
+    const code = '4892';
+    setOtpBanner(isHi ? `🔔 सुरक्षा OTP: ${code} (डेमो हेतु मान्य)` : `🔔 Demo OTP: ${code}`);
+    setTimeout(() => {
+      setOtpValue(code);
+      setIsOtpVerified(true);
+      setOtpBanner(isHi ? `✓ मोबाइल नंबर ${regPhone} पर OTP ${code} स्वतः सत्यापित हुआ!` : `✓ Phone ${regPhone} verified with OTP ${code}!`);
+    }, 1200);
+  };
+
+  // Handle Existing Login
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      if (selectedRole === 'farmer') {
+        const res = await fetch('/api/farmer/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, pin: password })
+        });
+        const data = await res.json();
+        if (data.success && data.user) {
+          onLoginSuccess(data.user, { farmer: data.farmer, slot: data.slot });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Check standard credentials
       const cred = validCredentials[selectedRole];
       const trimmedId = identifier.trim().toLowerCase();
       const trimmedPin = password.trim();
@@ -111,23 +205,78 @@ export const LoginView: React.FC<LoginViewProps> = ({
       } else {
         setErrorMessage(
           isHi
-            ? '❌ गलत क्रेडेंशियल्स! कृपया सही आईडी और पासवर्ड दर्ज करें। (Incorrect credentials. Please verify your details.)'
+            ? '❌ गलत क्रेडेंशियल्स! कृपया सही आईडी और पासवर्ड दर्ज करें।'
             : '❌ Incorrect credentials! Please check your ID and password.'
         );
       }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setErrorMessage(isHi ? 'लॉगिन में त्रुटि हुई' : 'Login failed');
+    } finally {
       setIsSubmitting(false);
-    }, 350);
+    }
   };
 
-  const applyDemo = (role: UserRole, testInvalid: boolean = false) => {
-    setSelectedRole(role);
+  // Handle New Farmer Registration
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setErrorMessage('');
-    if (testInvalid) {
-      setIdentifier('WRONG-ID-999');
-      setPassword('0000');
-      return;
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        farmerId: regFarmerId,
+        nameHi: regNameHi,
+        nameEn: regNameEn || regNameHi,
+        phone: regPhone,
+        pin: regPin,
+        aadhaar: regAadhaar,
+        samagraId: regSamagra,
+        village: regVillage,
+        district: regDistrict,
+        totalLandAcres: Number(regLandAcres) || 5,
+        registeredCrop: regCrop,
+        registeredQuantityLimit: Number(regQuantity) || 45,
+        mandiCenterName: regMandi,
+        slotDate: regDate,
+        slotTime: regTime,
+        vehicleNumber: regVehicleNo,
+        vehicleType: regVehicleType,
+        khasraNumber: regKhasra,
+        bankName: regBankName,
+        bankAccount: regBankAccount,
+        ifscCode: regIfsc,
+        aadhaarDocName: docAadhaarName,
+        khasraDocName: docKhasraName,
+        bankDocName: docBankName,
+        samagraDocName: docSamagraName
+      };
+
+      const response = await fetch('/api/farmer/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (data.success && data.user) {
+        // Directly proceed to farmer dashboard immediately with registered details
+        onLoginSuccess(data.user, { farmer: data.farmer, slot: data.slot });
+      } else {
+        setErrorMessage(data.error || (isHi ? 'पंजीकरण विफल रहा' : 'Registration failed'));
+      }
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      setErrorMessage(isHi ? 'सर्वर से संपर्क नहीं हो सका' : 'Network error');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const applyDemo = (role: UserRole) => {
+    handleRoleChange(role);
     if (role === 'farmer') {
+      setAuthMode('login');
       setIdentifier('MP-88210');
       setPassword('1234');
     } else if (role === 'mandi_operator') {
@@ -140,9 +289,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#f3f7f4] text-[#143425] flex flex-col font-sans selection:bg-[#1b7e45]/20">
-      {/* Top Gov Header Bar */}
-      <header className="bg-[#1b4d3e] text-white border-b border-[#143e31] sticky top-0 z-20 shadow-xs">
+    <div className="min-h-screen bg-radial from-[#e8f1ec] to-[#d6e5dc] flex flex-col justify-between selection:bg-[#1b7e45]/20">
+      {/* Top Header */}
+      <header className="bg-[#1b4d3e] text-white border-b border-[#143e31] sticky top-0 z-30 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center p-0.5 shadow-sm border border-[#c4dbcf] overflow-hidden flex-shrink-0">
@@ -151,20 +300,19 @@ export const LoginView: React.FC<LoginViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-black tracking-tight text-white">
-                  {isHi ? 'अन्नद्वार' : 'Anndwar'}
+                  {isHi ? 'अन्नद्वार' : 'AnnaDwar'}
                 </h1>
-                <span className="text-[10px] font-bold bg-[#2a6b54] text-[#d4f3e3] px-1.5 py-0.5 rounded tracking-wider border border-[#3d856b]">
-                  {isHi ? 'MSP e-उपार्जन पोर्टल' : 'MSP Procurement'}
+                <span className="text-[10px] font-bold bg-[#2a6b54] text-[#d4f3e3] px-2 py-0.5 rounded tracking-wider border border-[#3d856b]">
+                  {isHi ? 'किसान से देश तक' : 'Kisan se Desh Tak'}
                 </span>
               </div>
               <p className="text-[10.5px] text-[#b8d6c8] leading-tight">
-                {isHi ? 'खाद्य, नागरिक आपूर्ति एवं उपभोक्ता संरक्षण विभाग' : 'Dept. of Food, Civil Supplies & Consumer Protection'}
+                {isHi ? 'AnnaDwar - किसान से देश तक' : 'AnnaDwar - Kisan se Desh Tak'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* WhatsApp Floating Hint Button */}
             {onOpenWhatsAppHelp && (
               <button
                 onClick={onOpenWhatsAppHelp}
@@ -175,7 +323,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </button>
             )}
 
-            {/* Helpline */}
             <a
               href="tel:18001801551"
               className="hidden md:flex items-center gap-1.5 bg-[#255e4c] hover:bg-[#2c6e59] text-[#e8f5ef] text-xs px-3 py-1.5 rounded-full border border-[#3b7d67] transition-all"
@@ -184,7 +331,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <span className="font-semibold tracking-wide">1800-180-1551</span>
             </a>
 
-            {/* Language Switch */}
             <button
               onClick={onToggleLang}
               className="flex items-center gap-1.5 bg-[#255e4c] hover:bg-[#2c6e59] text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-[#3b7d67] transition-all cursor-pointer"
@@ -196,44 +342,53 @@ export const LoginView: React.FC<LoginViewProps> = ({
         </div>
       </header>
 
-      {/* Main Login Card Area */}
+      {/* Main Container */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-xl">
-          {/* Outer clean card */}
+        <div className={`w-full transition-all duration-300 ${selectedRole === 'farmer' && authMode === 'register' ? 'max-w-3xl' : 'max-w-xl'}`}>
           <div className="bg-white rounded-3xl border border-[#d2dfd6] shadow-sm p-6 sm:p-8">
-            {/* Title & Subtitle with Logo */}
+            {/* Header branding */}
             <div className="text-center mb-6">
-              <div className="flex justify-center mb-4">
-                <div className="w-24 h-24 rounded-full bg-white p-1 shadow-sm border border-[#cfe0d5] flex items-center justify-center overflow-hidden">
-                  <img src="/logo.png" alt="अन्नद्वार - किसान से देश तक" className="w-full h-full object-contain" />
+              <div className="flex justify-center mb-3">
+                <div className="w-20 h-20 rounded-full bg-white p-1 shadow-sm border border-[#cfe0d5] flex items-center justify-center overflow-hidden">
+                  <img src="/logo.png" alt="अन्नद्वार" className="w-full h-full object-contain" />
                 </div>
               </div>
-              <div className="inline-flex items-center gap-2 bg-[#edf7f1] text-[#14532d] text-xs font-bold px-3 py-1 rounded-full border border-[#bce3cb] mb-2.5">
+              <div className="inline-flex items-center gap-2 bg-[#edf7f1] text-[#14532d] text-xs font-bold px-3 py-1 rounded-full border border-[#bce3cb] mb-2">
                 <Sparkles className="w-3.5 h-3.5 text-[#1b7e45]" />
-                <span>{isHi ? 'सुरक्षित एकीकृत लॉगिन' : 'Secure Unified Access'}</span>
+                <span>AnnaDwar - Kisan se Desh Tak</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-[#143224] tracking-tight">
-                {isHi ? 'पोर्टल में प्रवेश करें' : 'Sign in to Anndwar'}
+                {selectedRole === 'farmer' ? (
+                  authMode === 'register'
+                    ? (isHi ? 'नया किसान पंजीकरण (Registration)' : 'New Farmer Registration')
+                    : (isHi ? 'किसान लॉगिन (Farmer Login)' : 'Farmer Sign In')
+                ) : selectedRole === 'mandi_operator' ? (
+                  isHi ? 'मंडी यार्ड ऑपरेटर टर्मिनल (Mandi Operator)' : 'Mandi Operator Terminal'
+                ) : (
+                  isHi ? 'उपार्जन प्रशासक कमांड सेंटर (Admin HQ)' : 'Admin HQ Command Centre'
+                )}
               </h2>
               <p className="text-xs sm:text-sm text-[#547362] mt-1">
-                {isHi
-                  ? 'किसान से देश तक — अपनी भूमिका चुनें एवं संबंधित क्रेडेंशियल्स दर्ज करें'
-                  : 'From Farmer to Nation — Select your authorized role and enter credentials'}
+                {selectedRole === 'farmer'
+                  ? (isHi ? 'अपनी वास्तविक जानकारी, फसल, स्लॉट एवं बैंक दस्तावेज दर्ज करें अथवा लॉगिन करें' : 'Enter your details, crop, slot & documents to access your custom dashboard')
+                  : selectedRole === 'mandi_operator'
+                  ? (isHi ? 'गेट आगमन, RFID स्कैनिंग, नमी परीक्षण एवं तौल नियंत्रण कंसोल' : 'Gate arrival, moisture test & weighbridge operations console')
+                  : (isHi ? 'राज्य स्तरीय उपार्जन निगरानी, साइलो स्टॉक एवं DBT भुगतान अनुमोदन' : 'Statewide procurement analytics, silo logistics & DBT payment approvals')}
               </p>
             </div>
 
-            {/* 3 Dedicated Role Selector Tabs */}
-            <div className="grid grid-cols-3 gap-2 p-1 bg-[#f0f5f2] rounded-2xl border border-[#dce8e0] mb-6">
+            {/* Top 3 Distinct Role Selector Tabs (ALWAYS VISIBLE AS REQUESTED) */}
+            <div className="grid grid-cols-3 gap-2 p-1.5 bg-[#f0f5f2] rounded-2xl border border-[#dce8e0] mb-5">
               <button
                 type="button"
                 onClick={() => handleRoleChange('farmer')}
                 className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   selectedRole === 'farmer'
-                    ? 'bg-white text-[#1b4d3e] shadow-xs ring-1 ring-black/5'
+                    ? 'bg-[#1b4d3e] text-white shadow-xs'
                     : 'text-[#506e5e] hover:text-[#183626]'
                 }`}
               >
-                <User className="w-4 h-4 text-[#1b7e45]" />
+                <User className="w-4 h-4" />
                 <span>{isHi ? 'किसान' : 'Farmer'}</span>
               </button>
 
@@ -242,11 +397,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 onClick={() => handleRoleChange('mandi_operator')}
                 className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   selectedRole === 'mandi_operator'
-                    ? 'bg-white text-[#854d0e] shadow-xs ring-1 ring-amber-300'
+                    ? 'bg-[#b45309] text-white shadow-xs'
                     : 'text-[#506e5e] hover:text-[#183626]'
                 }`}
               >
-                <Building2 className="w-4 h-4 text-[#b45309]" />
+                <Building2 className="w-4 h-4" />
                 <span>{isHi ? 'मंडी ऑपरेटर' : 'Operator'}</span>
               </button>
 
@@ -255,202 +410,679 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 onClick={() => handleRoleChange('admin')}
                 className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   selectedRole === 'admin'
-                    ? 'bg-white text-[#1e40af] shadow-xs ring-1 ring-blue-300'
+                    ? 'bg-[#1e40af] text-white shadow-xs'
                     : 'text-[#506e5e] hover:text-[#183626]'
                 }`}
               >
-                <ShieldCheck className="w-4 h-4 text-[#2563eb]" />
+                <ShieldCheck className="w-4 h-4" />
                 <span>{isHi ? 'प्रशासक' : 'Admin'}</span>
               </button>
             </div>
 
+            {/* If Farmer is selected: Toggle between Registration and Login */}
+            {selectedRole === 'farmer' && (
+              <div className="grid grid-cols-2 gap-2 p-1 bg-[#edf5f0] rounded-xl border border-[#d0e5d8] mb-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('register');
+                    setErrorMessage('');
+                  }}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    authMode === 'register'
+                      ? 'bg-white text-[#1b4d3e] shadow-xs ring-1 ring-black/5'
+                      : 'text-[#506e5e] hover:text-[#183626]'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>{isHi ? 'नया किसान पंजीकरण' : 'New Registration'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setErrorMessage('');
+                  }}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    authMode === 'login'
+                      ? 'bg-white text-[#1b4d3e] shadow-xs ring-1 ring-black/5'
+                      : 'text-[#506e5e] hover:text-[#183626]'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>{isHi ? 'पूर्व पंजीकृत लॉगिन' : 'Existing Login'}</span>
+                </button>
+              </div>
+            )}
+
             {/* Error Message Alert */}
             {errorMessage && (
-              <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-bold flex items-start gap-2.5 animate-bounce-once shadow-2xs">
+              <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-bold flex items-start gap-2.5 shadow-2xs">
                 <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 leading-snug">{errorMessage}</div>
               </div>
             )}
 
-            {/* Role Header Info */}
-            <div className="mb-5 p-3 rounded-xl bg-[#f9fbf9] border border-[#e2ede5] flex items-center justify-between text-xs">
-              <span className="text-[#597867]">
-                {selectedRole === 'farmer' && (isHi ? '🌾 किसान लॉगिन (ID या मोबाइल)' : '🌾 Farmer Login (Kisan ID / Phone)')}
-                {selectedRole === 'mandi_operator' && (isHi ? '🏢 गेट ऑपरेटर टर्मिनल' : '🏢 Mandi Operator Terminal')}
-                {selectedRole === 'admin' && (isHi ? '🛡️ राज्य मुख्यालय कमांड सेंटर' : '🛡️ State HQ Command Center')}
-              </span>
-              <span className="font-semibold text-[#1b7e45] bg-[#e6f4ec] px-2 py-0.5 rounded text-[11px]">
-                {isHi ? 'प्रमाणन आवश्यक' : 'Auth Required'}
-              </span>
-            </div>
-
-            {/* Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#143425] mb-1.5">
-                  {selectedRole === 'farmer' && (isHi ? 'किसान आईडी अथवा पंजीकृत मोबाइल सं.' : 'Kisan ID or Registered Mobile')}
-                  {selectedRole === 'mandi_operator' && (isHi ? 'ऑपरेटर यूज़र आईडी' : 'Operator User ID')}
-                  {selectedRole === 'admin' && (isHi ? 'अधिकारी ईमेल अथवा आईडी' : 'Official Email or ID')}
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={identifier}
-                    onChange={(e) => {
-                      setIdentifier(e.target.value);
-                      if (errorMessage) setErrorMessage('');
-                    }}
-                    placeholder={
-                      selectedRole === 'farmer'
-                        ? 'उदा: MP-88210 या 9826100001'
-                        : selectedRole === 'mandi_operator'
-                        ? 'उदा: MND-OP-02'
-                        : 'उदा: ADM-701'
-                    }
-                    className={`w-full pl-9 pr-3 py-2.5 rounded-xl border text-sm font-semibold transition-all bg-white text-gray-900 focus:outline-none ${
-                      errorMessage
-                        ? 'border-red-400 ring-2 ring-red-100'
-                        : 'border-[#cfe0d5] focus:border-[#1b7e45] focus:ring-2 focus:ring-[#1b7e45]/15'
-                    }`}
-                  />
-                </div>
+            {/* OTP Banner / Notification */}
+            {otpBanner && (
+              <div className="mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center justify-between animate-fadeIn">
+                <span>{otpBanner}</span>
+                <button type="button" onClick={() => setOtpBanner('')} className="text-emerald-700 hover:text-black font-bold">✕</button>
               </div>
+            )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-[#143425]">
-                    {selectedRole === 'farmer' ? (isHi ? '4-अंकीय सुरक्षा पिन' : '4-Digit Security PIN') : (isHi ? 'पासवर्ड' : 'Password')}
-                  </label>
-                  <span className="text-[11px] text-[#2c7a4b] hover:underline cursor-pointer">
-                    {isHi ? 'सहायता चाहिए?' : 'Need Help?'}
-                  </span>
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <Lock className="w-4 h-4" />
+            {/* =================================================================== */}
+            {/* 1. NEW FARMER REGISTRATION FORM WITH PHONETIC HINDI & DEDICATED SLOT */}
+            {/* =================================================================== */}
+            {selectedRole === 'farmer' && authMode === 'register' && (
+              <form onSubmit={handleRegisterSubmit} className="space-y-6">
+                {/* 1. किसान पहचान, मोबाइल OTP व पिन */}
+                <div className="bg-[#fafcfa] border border-[#dce8e0] rounded-2xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-[#e5efe8] pb-2 text-xs font-bold text-[#1b4d3e]">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-[#1b7e45]" />
+                      <span>{isHi ? '१. किसान पहचान, OTP सत्यापन एवं सुरक्षा पिन' : '1. Farmer ID, Mobile OTP & PIN'}</span>
+                    </div>
+                    <span className="text-[10px] bg-[#e3f7ec] text-[#147437] px-2 py-0.5 rounded-full border border-[#a6e2be]">
+                      {isHi ? 'e-KYC प्रक्रिया' : 'e-KYC Mode'}
+                    </span>
                   </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (errorMessage) setErrorMessage('');
-                    }}
-                    placeholder="••••"
-                    className={`w-full pl-9 pr-10 py-2.5 rounded-xl border text-sm font-semibold transition-all bg-white text-gray-900 focus:outline-none ${
-                      errorMessage
-                        ? 'border-red-400 ring-2 ring-red-100'
-                        : 'border-[#cfe0d5] focus:border-[#1b7e45] focus:ring-2 focus:ring-[#1b7e45]/15'
-                    }`}
-                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Farmer ID */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'किसान पहचान आईडी (Farmer ID)' : 'Farmer ID'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regFarmerId}
+                        onChange={(e) => setRegFarmerId(e.target.value)}
+                        placeholder="उदा: MP-88210"
+                        className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Mobile Number + OTP Button */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'मोबाइल नंबर (10 अंक)' : 'Mobile Number'} *
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="tel"
+                          required
+                          maxLength={10}
+                          value={regPhone}
+                          onChange={(e) => setRegPhone(e.target.value)}
+                          placeholder="9826199999"
+                          className="flex-1 px-3 py-2 text-xs font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSendOtp}
+                          className="px-2.5 py-2 bg-[#2d6f52] hover:bg-[#235841] text-white text-[11px] font-bold rounded-xl shadow-xs transition-all cursor-pointer flex-shrink-0"
+                        >
+                          {isOtpVerified ? (isHi ? '✓ सत्यापित' : '✓ Verified') : (isHi ? 'OTP भेजें' : 'Send OTP')}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* English Name Input (Auto transliterates to Hindi) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-[#143425]">
+                          {isHi ? 'किसान का नाम (अंग्रेजी में टाइप करें)' : 'Full Name (Type in English)'} *
+                        </label>
+                        <span className="text-[10px] text-[#1b7e45] font-semibold">
+                          🔤 {isHi ? 'स्वतः हिन्दी में छपेगा' : 'Auto Hindi'}
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        value={regNameEn}
+                        onChange={(e) => handleEnglishNameChange(e.target.value)}
+                        placeholder="Type in English (e.g. Ramesh Patel)"
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Hindi Name Display (Live Preview & Editable) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-[#143425]">
+                          {isHi ? 'हिन्दी में नाम (स्वतः दर्ज)' : 'Name in Hindi (Auto Transliterated)'} *
+                        </label>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
+                          ✓ देवनागरी
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        value={regNameHi}
+                        onChange={(e) => setRegNameHi(e.target.value)}
+                        placeholder="उदा: रमेश पटेल"
+                        className="w-full px-3 py-2 text-xs font-bold text-[#143e2c] rounded-xl border border-[#bce0ca] bg-[#f2faf5] focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Aadhaar Number */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'आधार संख्या (12 अंक)' : 'Aadhaar Number'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regAadhaar}
+                        onChange={(e) => setRegAadhaar(e.target.value)}
+                        placeholder="9821-4412-8890"
+                        className="w-full px-3 py-2 text-xs font-mono font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Samagra Family ID */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'समग्र सदस्य आईडी (8 अंक)' : 'Samagra Member ID'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regSamagra}
+                        onChange={(e) => setRegSamagra(e.target.value)}
+                        placeholder="48921008"
+                        className="w-full px-3 py-2 text-xs font-mono font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Village */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'गांव / ग्राम का नाम' : 'Village Name'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regVillage}
+                        onChange={(e) => setRegVillage(e.target.value)}
+                        placeholder="उदा: धर्मराजपुरा, सांवेर"
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* State & District */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'राज्य एवं जिला' : 'State & District'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regDistrict}
+                        onChange={(e) => setRegDistrict(e.target.value)}
+                        placeholder="उदा: इन्दौर (मध्य प्रदेश)"
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Set 4-Digit Security PIN */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? '4-अंकीय लॉगिन पिन सेट करें' : 'Set 4-Digit Security PIN'} *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        maxLength={4}
+                        value={regPin}
+                        onChange={(e) => setRegPin(e.target.value)}
+                        placeholder="1234"
+                        className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Total Agricultural Land */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'कुल कृषि भूमि (एकड़ में)' : 'Total Land (in Acres)'} *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        required
+                        value={regLandAcres}
+                        onChange={(e) => setRegLandAcres(Number(e.target.value))}
+                        placeholder="6.5"
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. DEDICATED OPTION: स्लॉट चयन व दस्तावेज अपलोड */}
+                <div className="bg-[#f2f8f4] border border-[#cbe4d4] rounded-2xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-[#d8ecde] pb-2 text-xs font-bold text-[#1b4d3e]">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-[#1b7e45]" />
+                      <span>{isHi ? '२. स्लॉट चयन एवं अनिवार्य दस्तावेज अपलोड (Select Slot & Upload Docs)' : '2. Select Slot & Upload Documents'}</span>
+                    </div>
+                    <span className="text-[10px] bg-[#1b4d3e] text-white px-2 py-0.5 rounded-full font-bold">
+                      {isHi ? 'मंडी बुकिंग' : 'Mandi Booking'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Mandi Selection */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'पसंदीदा उपार्जन केंद्र (Mandi)' : 'Preferred Mandi Center'} *
+                      </label>
+                      <select
+                        value={regMandi}
+                        onChange={(e) => setRegMandi(e.target.value)}
+                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      >
+                        <option value="सांवेर उपार्जन केंद्र">सांवेर उपार्जन केंद्र (इन्दौर)</option>
+                        <option value="उज्जैन कृषि उपज मंडी">उज्जैन कृषि उपज मंडी</option>
+                        <option value="देवास उपार्जन केंद्र">देवास उपार्जन केंद्र</option>
+                        <option value="बेटमा साइलो केंद्र">बेटमा साइलो केंद्र</option>
+                        <option value="महू कृषि केंद्र">महू कृषि केंद्र</option>
+                      </select>
+                    </div>
+
+                    {/* Crop Selection */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'उपार्जित फसल' : 'Registered Crop'} *
+                      </label>
+                      <select
+                        value={regCrop}
+                        onChange={(e) => setRegCrop(e.target.value)}
+                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      >
+                        <option value="शरबती गेहूँ (ग्रेड-A)">शरबती गेहूँ (MSP ₹2,400 + ₹125 MP बोनस)</option>
+                        <option value="चना (Gram Desi)">चना / Gram (MSP ₹5,440/क्विंटल)</option>
+                        <option value="सरसों (Mustard)">सरसों / Mustard (MSP ₹5,650/क्विंटल)</option>
+                        <option value="सोयाबीन (Soybean)">सोयाबीन / Soybean (MSP ₹4,892/क्विंटल)</option>
+                        <option value="धान (Paddy Grade-A)">धान / Paddy (MSP ₹2,300/क्विंटल)</option>
+                      </select>
+                    </div>
+
+                    {/* Quantity */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'विक्रय सीमा / मात्रा (क्विंटल में)' : 'Quantity Limit (Quintals)'} *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={regQuantity}
+                        onChange={(e) => setRegQuantity(Number(e.target.value))}
+                        placeholder="55"
+                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Slot Date */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'स्लॉट तारीख' : 'Slot Date'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regDate}
+                        onChange={(e) => setRegDate(e.target.value)}
+                        placeholder="27 अक्टूबर 2025"
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Slot Time Window */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'समय विंडो (Time Window)' : 'Time Window'} *
+                      </label>
+                      <select
+                        value={regTime}
+                        onChange={(e) => setRegTime(e.target.value)}
+                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      >
+                        <option value="09:00 AM – 10:30 AM">09:00 AM – 10:30 AM (प्रातः स्लॉट 1)</option>
+                        <option value="11:00 AM – 12:30 PM">11:00 AM – 12:30 PM (दोपहर स्लॉट 2)</option>
+                        <option value="01:30 PM – 03:00 PM">01:30 PM – 03:00 PM (अपराह्न स्लॉट 3)</option>
+                        <option value="03:30 PM – 05:00 PM">03:30 PM – 05:00 PM (सायं स्लॉट 4)</option>
+                      </select>
+                    </div>
+
+                    {/* Vehicle Number */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'वाहन क्रमांक' : 'Vehicle Number'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regVehicleNo}
+                        onChange={(e) => setRegVehicleNo(e.target.value)}
+                        placeholder="MP-09-EA-5542"
+                        className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+
+                    {/* Vehicle Type */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'वाहन प्रकार' : 'Vehicle Type'} *
+                      </label>
+                      <select
+                        value={regVehicleType}
+                        onChange={(e) => setRegVehicleType(e.target.value)}
+                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      >
+                        <option value="ट्रैक्टर ट्रॉली">ट्रैक्टर ट्रॉली (Tractor Trolley)</option>
+                        <option value="आयशर मिनी ट्रक">आयशर मिनी ट्रक (Mini Truck 10.80)</option>
+                        <option value="टाटा 407">टाटा 407 (Tata 407)</option>
+                        <option value="बैलगाड़ी">बैलगाड़ी (Bullock Cart)</option>
+                      </select>
+                    </div>
+
+                    {/* Khasra Number */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#143425] mb-1">
+                        {isHi ? 'भू-अभिलेख खसरा नंबर' : 'Khasra Number'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regKhasra}
+                        onChange={(e) => setRegKhasra(e.target.value)}
+                        placeholder="124/2, 125/1"
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-[#cfe0d5] bg-white focus:outline-none focus:border-[#1b7e45]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Document Uploads Area (4 Mandatory Documents) */}
+                  <div className="pt-3 border-t border-[#d8ecde] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#143425]">
+                        📁 {isHi ? 'अनिवार्य दस्तावेज अपलोड (Mandatory Documents):' : 'Mandatory Document Uploads:'}
+                      </span>
+                      <span className="text-[11px] text-[#1b7e45] font-semibold">
+                        {isHi ? '4/4 दस्तावेज तैयार' : '4/4 Ready'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Doc 1: Aadhaar */}
+                      <div className="p-2.5 rounded-xl border border-[#cfe0d5] bg-white flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[11px] font-bold text-[#183a2a] block truncate">
+                            1. आधार कार्ड (Aadhaar Card)
+                          </span>
+                          <span className="text-[10px] text-[#527060] truncate block">
+                            {docAadhaarName}
+                          </span>
+                        </div>
+                        <label className="cursor-pointer bg-[#eff8f3] hover:bg-[#e2f3e8] text-[#1b7e45] border border-[#a4dcbe] text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0">
+                          <Upload className="w-3 h-3" />
+                          <span>{isHi ? 'बदलें' : 'Upload'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files?.[0]) setDocAadhaarName(e.target.files[0].name);
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Doc 2: Khasra */}
+                      <div className="p-2.5 rounded-xl border border-[#cfe0d5] bg-white flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[11px] font-bold text-[#183a2a] block truncate">
+                            2. भू-अभिलेख खसरा नकल
+                          </span>
+                          <span className="text-[10px] text-[#527060] truncate block">
+                            {docKhasraName}
+                          </span>
+                        </div>
+                        <label className="cursor-pointer bg-[#eff8f3] hover:bg-[#e2f3e8] text-[#1b7e45] border border-[#a4dcbe] text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0">
+                          <Upload className="w-3 h-3" />
+                          <span>{isHi ? 'बदलें' : 'Upload'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files?.[0]) setDocKhasraName(e.target.files[0].name);
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Doc 3: Bank Passbook */}
+                      <div className="p-2.5 rounded-xl border border-[#cfe0d5] bg-white flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[11px] font-bold text-[#183a2a] block truncate">
+                            3. बैंक पासबुक / निरस्त चेक
+                          </span>
+                          <span className="text-[10px] text-[#527060] truncate block">
+                            {docBankName}
+                          </span>
+                        </div>
+                        <label className="cursor-pointer bg-[#eff8f3] hover:bg-[#e2f3e8] text-[#1b7e45] border border-[#a4dcbe] text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0">
+                          <Upload className="w-3 h-3" />
+                          <span>{isHi ? 'बदलें' : 'Upload'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files?.[0]) setDocBankName(e.target.files[0].name);
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Doc 4: Samagra ID */}
+                      <div className="p-2.5 rounded-xl border border-[#cfe0d5] bg-white flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[11px] font-bold text-[#183a2a] block truncate">
+                            4. समग्र परिवार आईडी
+                          </span>
+                          <span className="text-[10px] text-[#527060] truncate block">
+                            {docSamagraName}
+                          </span>
+                        </div>
+                        <label className="cursor-pointer bg-[#eff8f3] hover:bg-[#e2f3e8] text-[#1b7e45] border border-[#a4dcbe] text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 flex-shrink-0">
+                          <Upload className="w-3 h-3" />
+                          <span>{isHi ? 'बदलें' : 'Upload'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files?.[0]) setDocSamagraName(e.target.files[0].name);
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bank Details */}
+                  <div className="pt-3 border-t border-[#d8ecde] grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#143425] mb-1">
+                        {isHi ? 'बैंक का नाम' : 'Bank Name'}
+                      </label>
+                      <input
+                        type="text"
+                        value={regBankName}
+                        onChange={(e) => setRegBankName(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-[#cfe0d5] bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#143425] mb-1">
+                        {isHi ? 'खाता संख्या (A/c No)' : 'Account No'}
+                      </label>
+                      <input
+                        type="text"
+                        value={regBankAccount}
+                        onChange={(e) => setRegBankAccount(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs font-mono font-semibold rounded-lg border border-[#cfe0d5] bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#143425] mb-1">
+                        {isHi ? 'IFSC कोड' : 'IFSC Code'}
+                      </label>
+                      <input
+                        type="text"
+                        value={regIfsc}
+                        onChange={(e) => setRegIfsc(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs font-mono font-semibold rounded-lg border border-[#cfe0d5] bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Registration Button */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3.5 px-4 bg-[#1b4d3e] hover:bg-[#143b2f] text-white font-black text-sm rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {isSubmitting ? (
+                    <span>{isHi ? 'पंजीकरण एवं QR कोड सृजित हो रहा है...' : 'Generating QR & Registering...'}</span>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 text-[#88f0bc]" />
+                      <span>{isHi ? 'पंजीकरण एवं स्लॉट पुष्टि करें (सीधे पोर्टल खोलें)' : 'Confirm Registration & Open Portal'}</span>
+                      <ArrowRight className="w-4 h-4 text-[#88f0bc]" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* =================================================================== */}
+            {/* 2. SIGN IN FORM (FOR FARMER LOGIN, MANDI OPERATOR, OR ADMIN)       */}
+            {/* =================================================================== */}
+            {(selectedRole !== 'farmer' || authMode === 'login') && (
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div className="p-3 rounded-xl bg-[#f9fbf9] border border-[#e2ede5] flex items-center justify-between text-xs mb-2">
+                  <span className="text-[#597867] font-semibold">
+                    {selectedRole === 'farmer' && (isHi ? '🌾 पंजीकृत किसान लॉगिन (ID या मोबाइल)' : '🌾 Registered Farmer Sign In')}
+                    {selectedRole === 'mandi_operator' && (isHi ? '🏢 गेट ऑपरेटर टर्मिनल लॉगिन' : '🏢 Mandi Operator Terminal Sign In')}
+                    {selectedRole === 'admin' && (isHi ? '🛡️ राज्य मुख्यालय कमांड सेंटर लॉगिन' : '🛡️ State HQ Command Centre Sign In')}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                    onClick={() => applyDemo(selectedRole)}
+                    className="font-bold text-[#1b7e45] bg-[#e6f4ec] hover:bg-[#d6eedf] px-2 py-0.5 rounded text-[11px] cursor-pointer transition-all"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    ⚡ {isHi ? 'त्वरित डेमो डेटा भरें' : 'Fill Demo'}
                   </button>
                 </div>
-              </div>
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3 px-4 rounded-xl bg-[#1b4d3e] hover:bg-[#143d31] text-white font-bold text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-75"
-              >
-                {isSubmitting ? (
-                  <span>{isHi ? 'सत्यापित किया जा रहा है...' : 'Verifying...'}</span>
-                ) : (
-                  <>
-                    <span>{isHi ? 'प्रवेश करें (Login)' : 'Sign In'}</span>
-                    <ArrowRight className="w-4 h-4 text-[#88f0bc]" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Quick Demo Access Bar */}
-            <div className="mt-6 pt-5 border-t border-[#e5efe8]">
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-[11px] font-bold text-[#446654] uppercase tracking-wider">
-                  {isHi ? '⚡ त्वरित परीक्षण डेमो (1-Click Test):' : '⚡ 1-Click Quick Testing:'}
-                </span>
-                <span className="text-[10px] text-gray-400">Auto-fill</span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <button
-                  type="button"
-                  onClick={() => applyDemo('farmer')}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#eaf5ef] hover:bg-[#d8eedf] text-[#14532d] text-xs font-semibold text-center border border-[#b8dec6] transition-colors cursor-pointer"
-                >
-                  🌾 किसान (Ram Singh)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyDemo('mandi_operator')}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#fef9c3] hover:bg-[#fef08a] text-[#854d0e] text-xs font-semibold text-center border border-[#fde047] transition-colors cursor-pointer"
-                >
-                  🏢 ऑपरेटर (MND-02)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyDemo('admin')}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#eff6ff] hover:bg-[#dbeafe] text-[#1e40af] text-xs font-semibold text-center border border-[#bfdbfe] transition-colors cursor-pointer"
-                >
-                  🛡️ एडमिन (HQ Bhopal)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyDemo('farmer', true)}
-                  className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold text-center border border-red-200 transition-colors cursor-pointer"
-                  title="गलत विवरण डालकर वेरिफिकेशन एरर जांचें"
-                >
-                  ❌ गलत क्रेडेंशियल
-                </button>
-              </div>
-            </div>
-
-            {/* WhatsApp Alternative Assistant Box */}
-            <div className="mt-5 p-3.5 rounded-2xl bg-gradient-to-r from-[#e7f7ed] to-[#f2fbf5] border border-[#a8e2be] flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center font-bold text-base shadow-xs">
-                  💬
-                </div>
                 <div>
-                  <h4 className="text-xs font-bold text-[#14472c]">
-                    {isHi ? 'वेबसाइट चलाना नहीं आता? कोई बात नहीं!' : 'Difficult to use website?'}
-                  </h4>
-                  <p className="text-[11px] text-[#33684a]">
-                    {isHi ? 'व्हाट्सएप से रजिस्ट्रेशन व लाइव कतार जांचें' : 'Use WhatsApp for registration & queue check'}
-                  </p>
+                  <label className="block text-xs font-bold text-[#143425] mb-1.5">
+                    {selectedRole === 'farmer' && (isHi ? 'किसान आईडी अथवा पंजीकृत मोबाइल सं.' : 'Kisan ID or Registered Mobile')}
+                    {selectedRole === 'mandi_operator' && (isHi ? 'ऑपरेटर यूज़र आईडी' : 'Operator User ID')}
+                    {selectedRole === 'admin' && (isHi ? 'अधिकारी ईमेल अथवा आईडी' : 'Official Email or ID')}
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={identifier}
+                      onChange={(e) => {
+                        setIdentifier(e.target.value);
+                        if (errorMessage) setErrorMessage('');
+                      }}
+                      placeholder={
+                        selectedRole === 'farmer'
+                          ? 'उदा: MP-88210 या 9826199999'
+                          : selectedRole === 'mandi_operator'
+                          ? 'उदा: MND-OP-02'
+                          : 'उदा: ADM-701'
+                      }
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#cfe0d5] text-sm font-semibold transition-all bg-white text-gray-900 focus:outline-none focus:border-[#1b7e45]"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {onOpenWhatsAppHelp && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-[#143425]">
+                      {selectedRole === 'farmer' ? (isHi ? '4-अंकीय सुरक्षा पिन' : '4-Digit Security PIN') : (isHi ? 'पासवर्ड' : 'Password')}
+                    </label>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errorMessage) setErrorMessage('');
+                      }}
+                      placeholder={selectedRole === 'farmer' ? '1234' : '••••••••'}
+                      className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-[#cfe0d5] text-sm font-semibold transition-all bg-white text-gray-900 focus:outline-none focus:border-[#1b7e45]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
                 <button
-                  type="button"
-                  onClick={onOpenWhatsAppHelp}
-                  className="px-3 py-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex-shrink-0"
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={`w-full py-3 px-4 font-black text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 text-white ${
+                    selectedRole === 'farmer'
+                      ? 'bg-[#1b4d3e] hover:bg-[#143b2f]'
+                      : selectedRole === 'mandi_operator'
+                      ? 'bg-[#b45309] hover:bg-[#92400e]'
+                      : 'bg-[#1e40af] hover:bg-[#1e3a8a]'
+                  }`}
                 >
-                  {isHi ? 'सहायक खोलें' : 'Open Bot'}
+                  {isSubmitting ? (
+                    <span>{isHi ? 'सत्यापन हो रहा है...' : 'Authenticating...'}</span>
+                  ) : (
+                    <>
+                      <span>
+                        {selectedRole === 'farmer'
+                          ? (isHi ? 'किसान पोर्टल में प्रवेश करें' : 'Sign In to Farmer Portal')
+                          : selectedRole === 'mandi_operator'
+                          ? (isHi ? 'मंडी ऑपरेटर टर्मिनल खोलें' : 'Open Operator Terminal')
+                          : (isHi ? 'प्रशासक कमांड सेंटर खोलें' : 'Open Admin Command Centre')}
+                      </span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
-              )}
-            </div>
+              </form>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="py-3 text-center text-xs text-[#638472] border-t border-[#e2eee5] bg-white">
-        {isHi ? 'अन्नद्वार खाद्यान्न उपार्जन पोर्टल • राष्ट्रीय सूचना विज्ञान केंद्र (NIC) एवं राज्य शासन' : 'Anndwar Grain Procurement Portal • NIC & State Government'}
-      </footer>
     </div>
   );
 };

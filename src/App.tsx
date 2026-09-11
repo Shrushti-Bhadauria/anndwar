@@ -48,35 +48,49 @@ export default function App() {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
 
-  // Fetch initial data
+  const fetchAppData = async () => {
+    try {
+      const [fRes, sRes, dRes, pRes] = await Promise.all([
+        fetch('/api/farmer/profile'),
+        fetch('/api/slots/active'),
+        fetch('/api/farmer/documents'),
+        fetch('/api/farmer/payments')
+      ]);
+      const [fData, sData, dData, pData] = await Promise.all([
+        fRes.json(),
+        sRes.json(),
+        dRes.json(),
+        pRes.json()
+      ]);
+      if (fData && !fData.error) setFarmer(fData);
+      if (sData && !sData.error) setActiveSlot(sData);
+      if (Array.isArray(dData)) setDocuments(dData);
+      if (Array.isArray(pData)) setPayments(pData);
+    } catch (err) {
+      console.error('Data poll error:', err);
+    }
+  };
+
+  // Fetch initial data and poll every 3.5 seconds for live real-time sync
   useEffect(() => {
-    fetch('/api/farmer/profile')
-      .then((res) => res.json())
-      .then((data) => setFarmer(data))
-      .catch((err) => console.error(err));
-
-    fetch('/api/slots/active')
-      .then((res) => res.json())
-      .then((data) => setActiveSlot(data))
-      .catch((err) => console.error(err));
-
-    fetch('/api/farmer/documents')
-      .then((res) => res.json())
-      .then((data) => setDocuments(data))
-      .catch((err) => console.error(err));
-
-    fetch('/api/farmer/payments')
-      .then((res) => res.json())
-      .then((data) => setPayments(data))
-      .catch((err) => console.error(err));
+    fetchAppData();
+    const interval = setInterval(fetchAppData, 3500);
+    return () => clearInterval(interval);
   }, []);
 
   const toggleLanguage = () => {
     setLang((prev) => (prev === 'hi' ? 'en' : 'hi'));
   };
 
-  const handleLoginSuccess = (user: AuthUser) => {
+  const handleLoginSuccess = (user: AuthUser, extraData?: { farmer?: FarmerProfile; slot?: MandiSlot }) => {
     setCurrentUser(user);
+    if (extraData?.farmer) {
+      setFarmer(extraData.farmer);
+    }
+    if (extraData?.slot) {
+      setActiveSlot(extraData.slot);
+    }
+    fetchAppData();
     try {
       localStorage.setItem('anndwar_auth_user', JSON.stringify(user));
     } catch (err) {
@@ -210,6 +224,10 @@ export default function App() {
                   activeSlot={activeSlot}
                   onNavigateToMandiTerminal={() => setCurrentView('live_queue')}
                   onOpenReceipt={() => setIsReceiptOpen(true)}
+                  onOpenDbt={() => {
+                    setCurrentView('payments');
+                    setActiveDbtTab('status');
+                  }}
                 />
               )}
 
@@ -239,6 +257,14 @@ export default function App() {
               lang={lang}
               activeSlot={activeSlot}
               onOpenReceipt={() => setIsReceiptOpen(true)}
+              onViewFarmerPortal={() => {
+                setCurrentUser({
+                  username: farmer?.nameHi || 'कमल किशोर',
+                  name: farmer?.nameHi || 'कमल किशोर',
+                  role: 'farmer'
+                });
+                setCurrentView('farmer_home');
+              }}
             />
           )}
 

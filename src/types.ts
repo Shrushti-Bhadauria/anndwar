@@ -51,7 +51,7 @@ export interface PaymentRecord {
   date: string;
   seasonHi: string;
   seasonEn: string;
-  status: 'credit_successful' | 'processing' | 'pending';
+  status: 'credit_successful' | 'processing' | 'pending' | 'in_progress';
   utrNumber: string;
   mandiName: string;
   receiptNumber: string;

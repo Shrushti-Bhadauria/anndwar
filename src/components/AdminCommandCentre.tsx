@@ -5,6 +5,7 @@ import {
   Clock, 
   AlertTriangle, 
   CheckCircle, 
+  CheckCircle2,
   Radio, 
   ShieldAlert, 
   Check, 
@@ -16,9 +17,13 @@ import {
   RefreshCw, 
   Sparkles,
   Send,
-  CloudSun
+  CloudSun,
+  CreditCard,
+  User,
+  Calendar,
+  ExternalLink
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, FarmerProfile, MandiSlot, ProcurementStage } from '../types';
 
 interface AdminCommandCentreProps {
   lang: Language;
@@ -29,10 +34,50 @@ export const AdminCommandCentre: React.FC<AdminCommandCentreProps> = ({
   lang 
 }) => {
   const isHi = lang === 'hi';
-  const [activeTab, setActiveTab] = useState<'centers' | 'fleet' | 'anomalies'>('centers');
+  const [activeTab, setActiveTab] = useState<'centers' | 'fleet' | 'anomalies' | 'dbt_control'>('dbt_control');
   const [autoDiversion, setAutoDiversion] = useState(true);
   const [smsSent, setSmsSent] = useState(false);
   const [adminToast, setAdminToast] = useState<string | null>(null);
+
+  // Live farmer & DBT stage state for admin control
+  const [farmer, setFarmer] = useState<FarmerProfile | null>(null);
+  const [activeSlot, setActiveSlot] = useState<MandiSlot | null>(null);
+  const [stages, setStages] = useState<ProcurementStage[]>([]);
+  const [dbtStatus, setDbtStatus] = useState<'pending' | 'in_progress' | 'credit_successful'>('in_progress');
+  const [isDbtApproving, setIsDbtApproving] = useState(false);
+
+  const fetchLiveAdminData = async () => {
+    try {
+      const [fRes, sRes, stRes] = await Promise.all([
+        fetch('/api/farmer/profile'),
+        fetch('/api/slots/active'),
+        fetch('/api/stages')
+      ]);
+      const [fData, sData, stData] = await Promise.all([fRes.json(), sRes.json(), stRes.json()]);
+      setFarmer(fData);
+      setActiveSlot(sData);
+      if (Array.isArray(stData)) {
+        stData.sort((a, b) => a.step - b.step);
+        setStages(stData);
+        const stage7 = stData.find((s: any) => s.step === 7);
+        if (stage7?.status === 'completed') {
+          setDbtStatus('credit_successful');
+        } else if (stage7?.status === 'in_progress') {
+          setDbtStatus('in_progress');
+        } else {
+          setDbtStatus('pending');
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch live admin data:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveAdminData();
+    const interval = setInterval(fetchLiveAdminData, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Center balancing state
   const [centers, setCenters] = useState([
@@ -141,134 +186,444 @@ export const AdminCommandCentre: React.FC<AdminCommandCentreProps> = ({
     setTimeout(() => setAdminToast(null), 4000);
   };
 
+
+
+  const handleApproveDbtPayment = async () => {
+    setIsDbtApproving(true);
+    try {
+      const utr = 'SBIN' + Math.floor(100000000 + Math.random() * 900000000);
+      const res = await fetch('/api/farmer/dbt-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'credit_successful', utr })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDbtStatus('credit_successful');
+        setAdminToast(
+          isHi 
+            ? `✅ DBT भुगतान स्वीकृत! PFMS/APB द्वारा राशि सीधे किसान बैंक खाते में अंतरित (UTR: ${utr})`
+            : `✅ DBT Payment Approved! Credited directly via APB (UTR: ${utr})`
+        );
+        await fetchLiveAdminData();
+      }
+    } catch (e) {
+      console.error('Failed to approve DBT:', e);
+    } finally {
+      setIsDbtApproving(false);
+    }
+  };
+
+  const handleUpdateStage = async (stepNumber: number, status: 'completed' | 'in_progress' | 'upcoming') => {
+    try {
+      await fetch('/api/stages/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stepNumber, status })
+      });
+      setAdminToast(`चरण ${stepNumber} अद्यतन हुआ!`);
+      await fetchLiveAdminData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
-      {/* Top Banner / Greeting */}
+      {/* Top Greeting & Operational Status */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#2563eb] animate-pulse"></span>
+          <div className="w-9 h-9 rounded-xl bg-[#1b4d3e] text-white flex items-center justify-center shadow-xs">
+            <Building2 className="w-5 h-5 text-[#88f0bc]" />
+          </div>
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-[#143224] tracking-tight">
-              {isHi ? 'प्रशासक कमांड सेंटर (Admin Command HQ)' : 'State Procurement Command Centre'}
+              {isHi ? 'राज्य उपार्जन एवं साइलो कमांड सेंटर (State HQ)' : 'State Procurement & Silo Command Centre'}
             </h2>
             <p className="text-xs text-[#527060]">
-              {isHi ? 'खाद्य एवं नागरिक आपूर्ति संचालनालय, भोपाल • लाइव उपार्जन नियंत्रण कक्ष' : 'Directorate of Food & Civil Supplies, Bhopal'}
+              {isHi ? 'खाद्य, नागरिक आपूर्ति एवं उपभोक्ता संरक्षण संचालनालय, भोपाल' : 'Food, Civil Supplies & Consumer Protection Directorate, Bhopal'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 bg-white border border-[#cfe0d5] text-[#29563f] text-xs font-semibold px-3 py-1.5 rounded-xl shadow-xs">
-            <Radio className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-            <span>{isHi ? '18 उपार्जन केंद्र लाइव' : '18 Centers Live'}</span>
+            <Calendar className="w-3.5 h-3.5 text-[#1b7e45]" />
+            <span>26 अक्टूबर 2025</span>
           </div>
+          <span className="text-[11px] font-bold bg-[#edf7f1] text-[#1b7e45] border border-[#a8e3c1] px-2.5 py-1 rounded-xl">
+            {isHi ? 'मुख्यालय ऑनलाइन' : 'HQ Online'}
+          </span>
         </div>
       </div>
 
-      {/* Live Toast Banner */}
+      {/* Action Toast / Live Banner */}
       {adminToast && (
-        <div className="bg-[#eff6ff] border border-[#bfdbfe] text-[#1e40af] px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xs animate-fadeIn">
+        <div className="bg-[#edf9f2] border border-[#a6e2bf] text-[#14532d] px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xs animate-fadeIn">
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-[#2563eb]" />
+            <CheckCircle2 className="w-4 h-4 text-[#1b7e45]" />
             <span>{adminToast}</span>
           </div>
-          <button onClick={() => setAdminToast(null)} className="text-[#1e40af] hover:text-black font-bold cursor-pointer">✕</button>
+          <button onClick={() => setAdminToast(null)} className="text-[#14532d] hover:text-black font-bold cursor-pointer">✕</button>
         </div>
       )}
 
-      {/* 4 Clean Top Stat Cards */}
+      {/* 4 Summary Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="bg-white rounded-2xl border border-[#d2dfd6] p-4 sm:p-5 shadow-xs">
           <span className="text-xs text-[#637d70] font-medium block">
-            {isHi ? 'कुल खाद्यान्न उपार्जन' : 'Total Procured Today'}
+            {isHi ? 'राज्य दैनिक उपार्जन' : 'State Daily Procurement'}
           </span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-[#143224]">1,48,200</span>
-            <span className="text-xs font-bold text-[#3b6750]">क्विंटल</span>
+            <span className="text-2xl font-black text-[#143224]">8,150</span>
+            <span className="text-xs font-semibold text-[#3b6750]">क्विंटल</span>
           </div>
           <span className="text-[11px] text-[#2c8352] mt-1 font-semibold block">
-            {isHi ? '↑ लक्ष्य का 82% पूर्ण' : '82% of daily target'}
+            {isHi ? '✓ 4 उपार्जन केंद्र सक्रिय' : '4 Centers Live'}
           </span>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#d2dfd6] p-4 sm:p-5 shadow-xs">
           <span className="text-xs text-[#637d70] font-medium block">
-            {isHi ? 'सक्रिय धर्मकांटा लेन' : 'Active Scale Lanes'}
+            {isHi ? 'औसत मंडी प्रतीक्षा समय' : 'Avg Mandi Wait'}
           </span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-[#143224]">48 / 52</span>
-            <span className="text-xs font-semibold text-[#3b6750]">कांटे</span>
-          </div>
-          <span className="text-[11px] text-[#2c8352] mt-1 font-semibold block">
-            {isHi ? '✓ औसत तौल गति: 6.2m' : 'Avg weigh time: 6.2m'}
-          </span>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-[#d2dfd6] p-4 sm:p-5 shadow-xs">
-          <span className="text-xs text-[#637d70] font-medium block">
-            {isHi ? 'लॉजिस्टिक्स ट्रक इन-ट्रांजिट' : 'Fleet in Transit'}
-          </span>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-[#854d0e]">14</span>
-            <span className="text-xs font-semibold text-[#854d0e]">ट्रक साइलो मार्ग पर</span>
+            <span className="text-2xl font-black text-[#854d0e]">24</span>
+            <span className="text-xs font-semibold text-[#854d0e]">मिनट</span>
           </div>
           <span className="text-[11px] text-[#854d0e] mt-1 font-semibold block">
+            {isHi ? 'सांवेर में भार कम हुआ' : 'Smooth Transit'}
+          </span>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#d2dfd6] p-4 sm:p-5 shadow-xs">
+          <span className="text-xs text-[#637d70] font-medium block">
+            {isHi ? 'साइलो ट्रांजिट ट्रक' : 'Silo Transit Fleet'}
+          </span>
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="text-2xl font-black text-[#1b7e45]">3</span>
+            <span className="text-xs font-semibold text-[#3b6750]">सक्रिय मार्ग पर</span>
+          </div>
+          <span className="text-[11px] text-[#2c8352] mt-1 font-semibold block">
             {isHi ? '🔒 100% ई-सील संरक्षित' : 'E-Seal Protected'}
           </span>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#d2dfd6] p-4 sm:p-5 shadow-xs">
           <span className="text-xs text-[#637d70] font-medium block">
-            {isHi ? 'सुरक्षा व विसंगति अलर्ट' : 'Anomaly Alerts'}
+            {isHi ? 'DBT भुगतान स्थिति' : 'DBT Payment State'}
           </span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-[#b91c1c]">1</span>
-            <span className="text-xs font-semibold text-red-600">जांच दल तैनात</span>
+            <span className={`text-2xl font-black ${dbtStatus === 'credit_successful' ? 'text-[#1b7e45]' : 'text-[#854d0e]'}`}>
+              {dbtStatus === 'credit_successful' ? '✓ सफल' : 'प्रक्रियाधीन'}
+            </span>
           </div>
-          <span className="text-[11px] text-red-700 mt-1 font-semibold block">
-            {isHi ? 'तौल विसंगति (मांगलिया)' : 'Weight Discrepancy'}
+          <span className="text-[11px] text-[#2c8352] mt-1 font-semibold block">
+            {dbtStatus === 'credit_successful' ? 'खाते में क्रेडिट पूर्ण' : 'प्रशासक स्वीकृति प्रतीक्षारत'}
           </span>
         </div>
       </div>
 
       {/* Clean Modular Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-[#cfe0d5] pb-2 text-xs font-bold">
+      <div className="flex items-center gap-2 border-b border-[#cfe0d5] pb-2 text-xs font-bold overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('dbt_control')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'dbt_control'
+              ? 'bg-[#1b4d3e] text-white shadow-xs'
+              : 'text-[#506e5e] hover:bg-[#eaf1ec]'
+          }`}
+        >
+          <CreditCard className="w-4 h-4 text-emerald-400" />
+          <span>{isHi ? '१. किसान उपार्जन व DBT नियंत्रण' : '1. Farmer Procurement & DBT'}</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('centers')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'centers'
               ? 'bg-[#1b4d3e] text-white shadow-xs'
               : 'text-[#506e5e] hover:bg-[#eaf1ec]'
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>{isHi ? '१. उपार्जन केंद्र व ऑटो-डायवर्जन' : '1. Center Load & Balancing'}</span>
+          <span>{isHi ? '२. उपार्जन केंद्र व ऑटो-डायवर्जन' : '2. Center Load & Balancing'}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('fleet')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'fleet'
               ? 'bg-[#1b4d3e] text-white shadow-xs'
               : 'text-[#506e5e] hover:bg-[#eaf1ec]'
           }`}
         >
           <Truck className="w-4 h-4" />
-          <span>{isHi ? '२. लाइव ट्रक व जीपीएस ट्रैकर' : '2. Fleet GPS Tracking'}</span>
+          <span>{isHi ? '३. लाइव ट्रक व जीपीएस ट्रैकर' : '3. Fleet GPS Tracking'}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('anomalies')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'anomalies'
               ? 'bg-[#1b4d3e] text-white shadow-xs'
               : 'text-[#506e5e] hover:bg-[#eaf1ec]'
           }`}
         >
           <ShieldAlert className="w-4 h-4" />
-          <span>{isHi ? '३. विसंगति निवारण व मौसम अलर्ट' : '3. Alerts & Broadcast'}</span>
+          <span>{isHi ? '४. विसंगति निवारण व मौसम अलर्ट' : '4. Alerts & Broadcast'}</span>
         </button>
       </div>
+
+      {/* TAB 0: Farmer Consignment Live Control & DBT Approval */}
+      {activeTab === 'dbt_control' && (
+        <div className="space-y-5">
+          {/* Registered Farmer Details Live Card */}
+          <div className="bg-white rounded-2xl border border-[#d2dfd6] p-5 shadow-xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#e5eee8]">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-[#edf7f1] text-[#1b7e45] flex items-center justify-center border border-[#a8dec0] flex-shrink-0">
+                  <User className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-[#143224]">
+                      {farmer?.nameHi || 'किसान'} {farmer?.nameEn ? `(${farmer.nameEn})` : ''}
+                    </h3>
+                    <span className="text-[11px] font-bold bg-[#edf7f1] text-[#1b7e45] border border-[#a8dec0] px-2 py-0.5 rounded-full">
+                      पंजीकृत आईडी: {farmer?.id || 'MP-IND-2025-0914'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#527060] mt-0.5">
+                    ग्राम: {farmer?.village || 'सांवेर'}, जिला: {farmer?.district || 'इंदौर'} • मोबाइल: {farmer?.phone || '98260•••••'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${
+                  dbtStatus === 'credit_successful'
+                    ? 'bg-[#edf9f2] text-[#1b7e45] border-[#a6e2bf]'
+                    : 'bg-[#fffbeb] text-[#92400e] border-[#fde68a]'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${dbtStatus === 'credit_successful' ? 'bg-[#1b7e45]' : 'bg-[#d97706] animate-pulse'}`}></span>
+                  <span>{dbtStatus === 'credit_successful' ? (isHi ? 'DBT भुगतान पूर्ण ✓' : 'DBT Credited') : (isHi ? 'उपार्जन प्रक्रियाधीन' : 'In Progress')}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Consignment & Vehicle Quick Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
+              <div className="bg-[#f8faf9] p-3 rounded-xl border border-[#e2ece6]">
+                <span className="text-[11px] text-[#5e7e6e] block font-medium">उपज व कुल मात्रा</span>
+                <span className="text-sm font-bold text-[#143224]">
+                  {farmer?.registeredCrop || activeSlot?.crop || 'गेहूँ'} - {farmer?.registeredQuantityLimit || activeSlot?.quantityQuintal || 45} क्विंटल
+                </span>
+              </div>
+
+              <div className="bg-[#f8faf9] p-3 rounded-xl border border-[#e2ece6]">
+                <span className="text-[11px] text-[#5e7e6e] block font-medium">उपार्जन केंद्र व गेट</span>
+                <span className="text-sm font-bold text-[#143224]">
+                  {activeSlot?.mandiCenter || farmer?.mandiCenter || 'सांवेर केंद्र'} ({activeSlot?.gateNumber || 'गेट #02'})
+                </span>
+              </div>
+
+              <div className="bg-[#f8faf9] p-3 rounded-xl border border-[#e2ece6]">
+                <span className="text-[11px] text-[#5e7e6e] block font-medium">वाहन नंबर व टोकन</span>
+                <span className="text-sm font-bold text-[#143224]">
+                  {activeSlot?.vehicleNumber || farmer?.vehicleNumber || 'MP 09 AB 4512'} ({activeSlot?.tokenNumber || 'SAN-8842'})
+                </span>
+              </div>
+
+              <div className="bg-[#f8faf9] p-3 rounded-xl border border-[#e2ece6]">
+                <span className="text-[11px] text-[#5e7e6e] block font-medium">बैंक खाता (APB/PFMS)</span>
+                <span className="text-sm font-bold text-[#143224]">
+                  {farmer?.bankAccount || '•••••••• 4410'} ({farmer?.ifscCode || 'SBIN0001234'})
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 7 Stages Real-Time Progression Admin Controls */}
+          <div className="bg-white rounded-2xl border border-[#d2dfd6] p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h4 className="text-sm font-bold text-[#143224]">
+                  {isHi ? '७ चरणीय वास्तविक उपार्जन स्थिति व ऑपरेटर नियंत्रण' : '7 Stages Live Workflow & Operator Override'}
+                </h4>
+                <p className="text-xs text-[#527060]">
+                  {isHi ? 'यहाँ से किसी भी चरण को पूर्ण, चालू या प्रतीक्षारत करें — यह किसान पोर्टल पर तुरंत लाइव दिखेगा।' : 'Modify stage progress here — changes sync in real-time to farmer dashboard.'}
+                </p>
+              </div>
+              <span className="text-[11px] font-semibold text-[#1b7e45] bg-[#edf7f1] border border-[#a8dec0] px-2.5 py-1 rounded-xl">
+                ⚡ रीयल-टाइम सिंक सक्रिय
+              </span>
+            </div>
+
+            <div className="space-y-2.5">
+              {stages.map((st) => {
+                const isCompleted = st.status === 'completed';
+                const isInProgress = st.status === 'in_progress';
+                return (
+                  <div
+                    key={st.step}
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border gap-3 transition-all ${
+                      isCompleted
+                        ? 'bg-[#edf9f2] border-[#a6e2bf]'
+                        : isInProgress
+                        ? 'bg-[#fffaf0] border-[#fed7aa]'
+                        : 'bg-[#fbfcfb] border-[#e3ece6]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                          isCompleted
+                            ? 'bg-[#1b7e45] text-white'
+                            : isInProgress
+                            ? 'bg-[#c96c21] text-white'
+                            : 'bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {st.step}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[#143224]">
+                            {isHi ? st.titleHi : st.titleEn}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isCompleted
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : isInProgress
+                                ? 'bg-orange-100 text-orange-800 animate-pulse'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {isCompleted ? (isHi ? '✓ पूर्ण' : 'Done') : isInProgress ? (isHi ? '⏳ प्रगति पर' : 'Active') : (isHi ? 'प्रतीक्षारत' : 'Pending')}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#5e7e6e] block">
+                          {isHi ? st.subHi : st.subEn} • {st.details}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick status toggle buttons for Admin */}
+                    <div className="flex items-center gap-1.5 self-end sm:self-auto flex-shrink-0">
+                      <button
+                        onClick={() => handleUpdateStage(st.step, 'completed')}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                          isCompleted
+                            ? 'bg-[#1b7e45] text-white shadow-xs'
+                            : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300'
+                        }`}
+                        title="पूर्ण चिह्नित करें"
+                      >
+                        ✓ {isHi ? 'पूर्ण' : 'Complete'}
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStage(st.step, 'in_progress')}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                          isInProgress
+                            ? 'bg-[#c96c21] text-white shadow-xs'
+                            : 'bg-white hover:bg-orange-50 text-orange-800 border border-orange-300'
+                        }`}
+                        title="प्रगति पर चिह्नित करें"
+                      >
+                        ⏳ {isHi ? 'चालू' : 'Active'}
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStage(st.step, 'upcoming')}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                          !isCompleted && !isInProgress
+                            ? 'bg-gray-700 text-white shadow-xs'
+                            : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-300'
+                        }`}
+                        title="प्रतीक्षारत चिह्नित करें"
+                      >
+                        ⚪ {isHi ? 'बाकी' : 'Pending'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* DBT Payment Approval & Release Card */}
+          <div className="bg-white rounded-2xl border border-[#d2dfd6] p-5 shadow-xs space-y-4">
+            <div className="flex items-start justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#edf9f2] text-[#1b7e45] flex items-center justify-center border border-[#a8dec0]">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-[#143224]">
+                    {isHi ? 'चरण ७: डीबीटी प्रत्यक्ष लाभ अंतरण स्वीकृति (DBT Direct Bank Transfer)' : 'Stage 7: DBT Direct Benefit Transfer Approval'}
+                  </h4>
+                  <p className="text-xs text-[#527060]">
+                    {isHi ? 'इलेक्ट्रॉनिक धर्मकांटा व वेयरहाउस पावती उपरांत किसान के बैंक खाते में सीधा भुगतान' : 'PFMS / APB direct credit to Aadhaar seeded bank account'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-xs text-[#5e7e6e] block font-medium">देय कुल उपार्जन राशि (MSP + बोनस)</span>
+                <span className="text-xl font-black text-[#143224]">
+                  ₹{(((farmer?.registeredQuantityLimit || activeSlot?.quantityQuintal || 45) * 2600)).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {dbtStatus === 'credit_successful' ? (
+              <div className="p-4 rounded-xl bg-[#edf9f2] border border-[#a6e2bf] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-[#1b7e45] flex-shrink-0" />
+                  <div>
+                    <h5 className="text-xs font-bold text-[#14532d]">
+                      {isHi ? '✅ DBT भुगतान सफलतापूर्वक स्वीकृत व खाते में अंतरित!' : 'DBT Payment Successfully Approved & Credited!'}
+                    </h5>
+                    <p className="text-[11px] text-[#285e3c]">
+                      UTR: <strong className="font-mono">{farmer?.dbtUtrNumber || 'SBIN882194821'}</strong> • माध्यम: PFMS / NPCI APB गेटवे • खाता: {farmer?.bankAccount || '•••••••• 4410'}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-[#1b7e45] bg-white px-3 py-1.5 rounded-lg border border-[#a6e2bf] shadow-xs">
+                  {isHi ? '✓ भुगतान पूर्ण' : 'Payment Completed'}
+                </span>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-[#fffbeb] border border-[#fde68a] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h5 className="text-xs font-bold text-[#92400e]">
+                    {isHi ? '⚠️ डीबीटी बैंक भुगतान स्वीकृति लंबित' : 'DBT Bank Transfer Pending Approval'}
+                  </h5>
+                  <p className="text-[11px] text-[#78350f]">
+                    {isHi
+                      ? 'तौल पर्ची व पावती जारी हो चुकी है। कृपया सीधे किसान बैंक खाते में राशि अंतरित करने हेतु स्वीकृति दें।'
+                      : 'Weighment slip issued. Please approve to credit payment directly into farmer account.'}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleApproveDbtPayment}
+                  disabled={isDbtApproving}
+                  className="px-5 py-2.5 bg-[#1b7e45] hover:bg-[#146637] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer flex-shrink-0 disabled:opacity-50"
+                >
+                  <CreditCard className="w-4 h-4 text-[#88f0bc]" />
+                  <span>
+                    {isDbtApproving
+                      ? (isHi ? 'भुगतान प्रक्रियाधीन...' : 'Processing...')
+                      : (isHi ? '💳 डीबीटी बैंक भुगतान स्वीकृत करें' : 'Approve DBT Payment')}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: Center Balancing & Auto-diversion */}
       {activeTab === 'centers' && (

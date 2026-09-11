@@ -7,12 +7,7 @@ import {
   FileCheck2, 
   Radio, 
   ArrowRight, 
-  CheckCircle2, 
-  Building2,
-  Sparkles,
-  MapPin,
-  TrendingUp,
-  AlertTriangle
+  CheckCircle2
 } from 'lucide-react';
 import { Language, FarmerProfile, MandiSlot } from '../types';
 
@@ -54,13 +49,14 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
         </div>
       </div>
 
-      {/* AI Pre-Check Quick Banner (innovation from prompt) */}
+
+      {/* AI Pre-Check Quick Banner (innovation from prompt)
       <div className="mb-6 bg-gradient-to-r from-[#eef9f2] via-[#e8f6ed] to-[#edf7f1] border border-[#bce3cb] rounded-2xl p-4 shadow-xs flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#1b4d3e] text-white flex items-center justify-center shadow-xs">
             <Sparkles className="w-5 h-5 text-[#88f0bc]" />
-          </div>
-          <div>
+          </div> */}
+          {/* <div>
             <div className="flex items-center gap-2">
               <h4 className="text-xs sm:text-sm font-bold text-[#143828]">
                 {isHi ? '🌾 AI फसल पूर्व-जांच (AI Crop Pre-Check + मौसम चेतावनी)' : '🌾 AI Crop Pre-Check + Weather Alert'}
@@ -84,10 +80,12 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
           <span>{isHi ? 'फसल की फोटो जांचें' : 'Test Grain Quality'}</span>
           <ArrowRight className="w-3.5 h-3.5 text-[#88f0bc]" />
         </button>
-      </div>
+      </div> */}
 
       {/* Section 1: चयनित: आज का स्लॉट एवं समय विवरण (Exact match to Screenshot 6) */}
-      <div className="mb-8">
+      {/* <div className="mb-8"> */}
+        <div className="pt-3 md:pt-0 md:pl-6 flex flex-col justify-center">
+
         <h3 className="text-sm font-bold text-[#1a3828] mb-3">
           {isHi ? 'चयनित: आज का स्लॉट एवं समय विवरण' : 'Selected: Today Slot & Time Details'}
         </h3>
@@ -155,7 +153,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
           {/* Card 1: आज का स्लॉट एवं समय */}
           <div 
             onClick={() => onNavigate('slot_booking')}
-            className="bg-white rounded-xl p-4 border-2 border-[#1b7e45]/60 hover:border-[#1b7e45] shadow-xs cursor-pointer transition-all flex flex-col justify-between group"
+            className="bg-white rounded-xl p-4  border-[#d5e2d9] hover:border-[#1b7e45] shadow-xs cursor-pointer transition-all flex flex-col justify-between group"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="w-9 h-9 rounded-lg bg-[#eaf4ee] text-[#1b4d3e] flex items-center justify-center">
@@ -277,7 +275,7 @@ export const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
           {/* Card 6: त्वरित सहायता / री-शेड्यूल */}
           <div 
             onClick={onOpenReschedule}
-            className="bg-gradient-to-br from-[#fbfdfb] to-[#f2f7f3] rounded-xl p-4 border border-[#d2ded5] hover:border-[#1b7e45] shadow-xs cursor-pointer transition-all flex flex-col justify-between group"
+            className="bg-linear-to-br from-[#fbfdfb] to-[#f2f7f3] rounded-xl p-4 border border-[#d2ded5] hover:border-[#1b7e45] shadow-xs cursor-pointer transition-all flex flex-col justify-between group"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="w-9 h-9 rounded-lg bg-[#e3efe6] text-[#1b4d3e] flex items-center justify-center">

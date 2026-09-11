@@ -7,7 +7,7 @@ import mandiRoutes from './mandiRoutes.js';
 import logisticsRoutes from './logisticsRoutes.js';
 import godownRoutes from './godownRoutes.js';
 import compassRoutes from './compassRoutes.js';
-import { getStages } from '../controllers/queueController.js';
+import { getStages, updateStage } from '../controllers/queueController.js';
 
 const router = Router();
 
@@ -21,6 +21,7 @@ router.use('/farmer', farmerRoutes);
 router.use('/slots', slotRoutes);
 router.use('/queue', queueRoutes);
 router.get('/stages', getStages);
+router.post('/stages/update', updateStage);
 router.use('/ai', cropRoutes);
 router.use('/mandis', mandiRoutes);
 router.use('/logistics', logisticsRoutes);

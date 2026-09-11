@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Check, 
   Calendar as CalendarIcon, 
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Language, MandiSlot } from '../types';
+import { generateQrDataUrl } from '../utils/qrGenerator';
 
 interface SlotBookingProps {
   lang: Language;
@@ -36,6 +37,14 @@ export const SlotBooking: React.FC<SlotBookingProps> = ({
   onViewLiveQueue,
 }) => {
   const isHi = lang === 'hi';
+  const [gateQrUrl, setGateQrUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (activeSlot) {
+      const qrData = activeSlot.qrCodeData || `ANNDWAR|TOKEN:${activeSlot.tokenNumber}|FARMER:${activeSlot.farmerId}|CROP:${activeSlot.cropName}|QTY:${activeSlot.quantityQuintal}Q|MANDI:${activeSlot.mandiCenterName}`;
+      generateQrDataUrl(qrData).then((url) => setGateQrUrl(url));
+    }
+  }, [activeSlot]);
 
   const [selectedDate, setSelectedDate] = useState<string>(
     activeSlot ? activeSlot.date.replace(' 2025', '') : '27 Oct'
@@ -323,30 +332,45 @@ export const SlotBooking: React.FC<SlotBookingProps> = ({
               </div>
             </div>
 
-            {/* Actions for Confirmed Slot (Screenshot 7 buttons) */}
-            <div className="flex items-center gap-2 w-full lg:w-auto flex-wrap sm:flex-nowrap">
+            {/* Actions for Confirmed Slot & Mandi Gate QR Display */}
+            <div className="flex items-center gap-3 w-full lg:w-auto flex-wrap sm:flex-nowrap">
+              {/* Gate Entry QR Card */}
+              <div 
+                onClick={onOpenReceipt}
+                className="bg-[#f2f8f4] border border-[#a8dbc0] rounded-xl p-2 flex items-center gap-2 cursor-pointer hover:bg-[#e6f4ec] transition-colors"
+                title={isHi ? 'गेट पर दिखाने हेतु QR कोड' : 'Gate Entry QR'}
+              >
+                <div className="w-10 h-10 bg-white rounded-lg border border-[#bfe2cc] flex items-center justify-center p-0.5 overflow-hidden shadow-2xs">
+                  {gateQrUrl ? (
+                    <img src={gateQrUrl} alt="QR" className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-base font-bold">📱</span>
+                  )}
+                </div>
+                <div className="text-left pr-1">
+                  <span className="text-[10px] font-bold text-[#14532d] block uppercase tracking-wider">
+                    {isHi ? 'गेट प्रवेश QR' : 'Gate Pass QR'}
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-[#1b4d3e]">
+                    #{activeSlot.tokenNumber}
+                  </span>
+                </div>
+              </div>
+
               <button
                 onClick={onOpenReceipt}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white hover:bg-[#f2f7f4] text-[#183928] text-xs font-semibold px-3.5 py-2 rounded-xl border border-[#cbdcd0] shadow-2xs transition-colors cursor-pointer"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-[#1b4d3e] hover:bg-[#143e31] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5 text-[#246146]" />
+                <Download className="w-3.5 h-3.5 text-[#88f0bc]" />
                 <span>{isHi ? 'स्लॉट रसीद (PDF)' : 'Receipt (PDF)'}</span>
               </button>
 
               <button
                 onClick={onOpenReschedule}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white hover:bg-[#f2f7f4] text-[#183928] text-xs font-semibold px-3.5 py-2 rounded-xl border border-[#cbdcd0] shadow-2xs transition-colors cursor-pointer"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white hover:bg-[#f2f7f4] text-[#183928] text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-[#cbdcd0] shadow-2xs transition-colors cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-[#246146]" />
-                <span>{isHi ? 'स्लॉट री-शेड्यूल करें' : 'Reschedule'}</span>
-              </button>
-
-              <button
-                onClick={onViewLiveQueue}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-[#1b4d3e] hover:bg-[#153f33] text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                <Eye className="w-3.5 h-3.5 text-[#88f0bc]" />
-                <span>{isHi ? 'लाइव कतार में देखें' : 'View in Queue'}</span>
+                <span>{isHi ? 'री-शेड्यूल' : 'Reschedule'}</span>
               </button>
             </div>
           </div>
@@ -399,29 +423,6 @@ export const SlotBooking: React.FC<SlotBookingProps> = ({
         </div>
       </div>
 
-      {/* Traffic & Center Slot Status Banner (Screenshot 7 green radar alert) */}
-      <div className="bg-[#eef8f2] border border-[#bfe2cc] rounded-xl p-3.5 mb-6 flex items-center justify-between flex-wrap gap-2 text-xs text-[#205139]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-full bg-[#1b7e45] text-white flex items-center justify-center shrink-0">
-            <Radio className="w-3.5 h-3.5 animate-pulse" />
-          </div>
-          <div>
-            <span className="font-bold text-[#143e2a]">
-              {isHi ? 'सांवेर उपार्जन केंद्र - यातायात एवं स्लॉट स्थिति: ' : 'Sanwer Centre - Traffic & Queue Status: '}
-            </span>
-            <span className="text-[#325b46]">
-              {isHi
-                ? 'वर्तमान में सभी 4 तौल कांटे सुचारू हैं। औसत प्रतीक्षा समय मात्र 25 मिनट (कम भीड़ / High Clearance Rate)'
-                : 'All 4 electronic weigh-scales operational. Average wait only 25 min (Low congestion)'}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 bg-[#e3f5eb] text-[#147437] font-bold text-[11px] px-2.5 py-1 rounded-full border border-[#a4deb9]">
-          <span className="w-2 h-2 rounded-full bg-[#1b7e45]"></span>
-          <span>{isHi ? 'न्यूनतम प्रतीक्षा केंद्र' : 'Lowest Wait Centre'}</span>
-        </div>
-      </div>
 
       {/* Date Selection Grid (Exact match to Screenshot 7 5 cards) */}
       <div className="mb-6">

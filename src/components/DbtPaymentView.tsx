@@ -139,76 +139,95 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
     setIsAdviceModalOpen(true);
   };
 
-  // Real-Time Dynamic Stage Engine
-  const [currentDbtStage, setCurrentDbtStage] = useState<number>(5);
-  const [autoProgress, setAutoProgress] = useState<boolean>(false);
-  const [dbtToast, setDbtToast] = useState<string | null>(null);
+  // Dynamic payment calculation based on actual registered farmer crop & quantity
+  const registeredCrop = farmer?.registeredCrop || 'गेहूँ (शरबती)';
+  const registeredQty = farmer?.registeredQuantityLimit || 45;
 
-  // Auto-progress simulation
-  useEffect(() => {
-    if (!autoProgress) return;
-    const timer = setInterval(() => {
-      setCurrentDbtStage((prev) => {
-        const next = prev >= 6 ? 1 : prev + 1;
-        if (next === 6) {
-          confetti({ particleCount: 75, spread: 70, origin: { y: 0.6 } });
-          setDbtToast(
-            isHi 
-              ? '🎉 बधाई! चरण 6 पूर्ण - ₹1,08,000.00 सीधे बैंक खाते में जमा!' 
-              : '🎉 Stage 6 Complete - ₹1,08,000.00 credited to bank!'
-          );
-        } else {
-          setDbtToast(
-            isHi ? `⚡ ऑटो-सिंक: चरण ${next} पर आगे बढ़ा!` : `⚡ Auto-sync: Advanced to Stage ${next}!`
-          );
-        }
-        setTimeout(() => setDbtToast(null), 3000);
-        return next;
-      });
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [autoProgress, isHi]);
+  let unitMsp = 2275;
+  let unitBonus = 175;
+  let cropDisplayName = registeredCrop;
 
-  const advanceStage = () => {
-    setCurrentDbtStage((prev) => {
-      const next = prev >= 6 ? 1 : prev + 1;
-      if (next === 6) {
-        confetti({ particleCount: 85, spread: 75, origin: { y: 0.6 } });
-        setDbtToast(
-          isHi 
-            ? '🎉 बधाई! चरण 6 पूर्ण - ₹1,08,000.00 सीधे बैंक खाते में क्रेडिट हो गया है!' 
-            : '🎉 Congratulations! Stage 6 Complete - ₹1,08,000.00 Credited!'
-        );
-      } else {
-        setDbtToast(
-          isHi ? `चरण ${next} सफलतापूर्वक सक्रिय हुआ!` : `Stage ${next} successfully activated!`
-        );
-      }
-      setTimeout(() => setDbtToast(null), 3500);
-      return next;
-    });
-  };
+  if (registeredCrop.includes('चना') || registeredCrop.toLowerCase().includes('gram')) {
+    unitMsp = 5440;
+    unitBonus = 0;
+  } else if (registeredCrop.includes('सरसों') || registeredCrop.toLowerCase().includes('mustard')) {
+    unitMsp = 5650;
+    unitBonus = 0;
+  } else if (registeredCrop.includes('धान') || registeredCrop.toLowerCase().includes('paddy')) {
+    unitMsp = 2300;
+    unitBonus = 100;
+  } else {
+    // Default wheat
+    unitMsp = 2275;
+    unitBonus = 175;
+  }
 
-  const jumpToStage = (stageNum: number) => {
-    setCurrentDbtStage(stageNum);
-    if (stageNum === 6) {
-      confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
-      setDbtToast(isHi ? '🎉 चरण 6: राशि खाते में जमा!' : '🎉 Stage 6: Payment credited!');
+  const effectiveRate = unitMsp + unitBonus;
+  const centralMspTotal = unitMsp * registeredQty;
+  const stateBonusTotal = unitBonus * registeredQty;
+  const grossTotal = centralMspTotal + stateBonusTotal;
+
+  const getAmountInWords = (num: number, isHiMode: boolean) => {
+    if (isHiMode) {
+      if (num === 108000) return 'एक लाख आठ हज़ार रुपये केवल';
+      if (num === 117000) return 'एक लाख सत्रह हज़ार रुपये केवल';
+      if (num === 244800) return 'दो लाख चवालीस हज़ार आठ सौ रुपये केवल';
+      return `${num.toLocaleString('en-IN')} रुपये केवल`;
     } else {
-      setDbtToast(isHi ? `चरण ${stageNum} पर स्विच किया गया` : `Switched to stage ${stageNum}`);
+      return `${num.toLocaleString('en-IN')} Rupees Only`;
     }
-    setTimeout(() => setDbtToast(null), 3000);
   };
 
-  // Stepper lifecycle items (Dynamically computed based on currentDbtStage)
+  // Real-Time Dynamic Stage Engine & Live Sync with Admin Approval
+  const [currentDbtStage, setCurrentDbtStage] = useState<number>(
+    farmer?.dbtPaymentStatus === 'credit_successful' ? 6 : 5
+  );
+  const [liveDbtStatus, setLiveDbtStatus] = useState<string>(farmer?.dbtPaymentStatus || 'in_progress');
+  const [liveUtr, setLiveUtr] = useState<string | undefined>(farmer?.dbtUtrNumber);
+
+  // Poll live DBT status from backend
+  useEffect(() => {
+    const fetchDbt = async () => {
+      try {
+        const [pRes, sRes] = await Promise.all([
+          fetch('/api/farmer/profile'),
+          fetch('/api/stages')
+        ]);
+        const pData = await pRes.json();
+        const sData = await sRes.json();
+
+        if (pData?.dbtPaymentStatus) {
+          setLiveDbtStatus(pData.dbtPaymentStatus);
+          if (pData.dbtPaymentStatus === 'credit_successful') {
+            setCurrentDbtStage(6);
+            if (pData.dbtUtrNumber) setLiveUtr(pData.dbtUtrNumber);
+          }
+        }
+        if (Array.isArray(sData)) {
+          const st7 = sData.find((s: any) => s.step === 7);
+          if (st7?.status === 'completed') {
+            setCurrentDbtStage(6);
+            setLiveDbtStatus('credit_successful');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to poll live DBT state:', e);
+      }
+    };
+    fetchDbt();
+    const interval = setInterval(fetchDbt, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Stepper lifecycle items (Dynamically computed based on currentDbtStage and farmer consignment)
   const stageDefs = [
     {
       step: 1,
       title: isHi ? '1. तौल प्रमाणीकरण' : '1. Weighment Auth',
-      subDone: '45.00 Qtl - पूर्ण',
+      subDone: `${registeredQty}.00 Qtl - पूर्ण`,
       subActive: isHi ? 'इलेक्ट्रॉनिक कांटा सक्रिय' : 'Scale Active',
       subPending: isHi ? 'कांटा प्रतीक्षा' : 'Scale Pending',
-      timeDone: '26 Oct, 10:15 AM',
+      timeDone: 'आज, 10:15 AM',
       timeActive: isHi ? 'अभी लाइव' : 'Live Now',
       timePending: isHi ? 'लंबित' : 'Pending',
       trigger: isHi ? 'इलेक्ट्रॉनिक धर्मकांटा ग्रॉस-टेयर वजन दर्ज होने पर' : 'Electronic scale gross/tare weight log',
@@ -217,9 +236,9 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
       step: 2,
       title: isHi ? '2. गुणवत्ता अनुमोदन' : '2. Quality Clearance',
       subDone: 'FAQ Grade - 11.2% नमी',
-      subActive: isHi ? 'लैब नमी जांच जारी' : 'Lab Testing Moisture',
-      subPending: isHi ? 'लैब स्लॉट प्रतीक्षारत' : 'Lab Awaited',
-      timeDone: '26 Oct, 11:30 AM',
+      subActive: isHi ? 'डिजिटल नमी जांच जारी' : 'Lab Testing Moisture',
+      subPending: isHi ? 'नमी स्लॉट प्रतीक्षारत' : 'Lab Awaited',
+      timeDone: 'आज, 11:30 AM',
       timeActive: isHi ? 'अभी लाइव' : 'Live Now',
       timePending: isHi ? 'लंबित' : 'Pending',
       trigger: isHi ? 'मंडी गुणवत्ता परीक्षक द्वारा नमी <12% प्रमाणित करने पर' : 'Moisture meter <12% FAQ pass',
@@ -230,7 +249,7 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
       subDone: 'मुंशी ई-हस्ताक्षरित',
       subActive: isHi ? 'अनलोडिंग व मुंशी जांच' : 'Unloading & Munshi Check',
       subPending: isHi ? 'गोदाम आवंटन शेष' : 'Godown Awaited',
-      timeDone: '26 Oct, 01:45 PM',
+      timeDone: 'आज, 01:45 PM',
       timeActive: isHi ? 'अभी लाइव' : 'Live Now',
       timePending: isHi ? 'लंबित' : 'Pending',
       trigger: isHi ? 'गोदाम मुंशी द्वारा ई-सील मिलान व डिजिटल रसीद जारी करने पर' : 'Warehouse Munshi W/R acceptance & sign',
@@ -241,7 +260,7 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
       subDone: '#BIL-2025-8821',
       subActive: isHi ? 'ई-उपार्जन बिल जनरेशन' : 'Bill Generating',
       subPending: isHi ? 'बिल संस्तुति शेष' : 'Bill Pending',
-      timeDone: '26 Oct, 03:10 PM',
+      timeDone: 'आज, 03:10 PM',
       timeActive: isHi ? 'अभी लाइव' : 'Live Now',
       timePending: isHi ? 'लंबित' : 'Pending',
       trigger: isHi ? 'ई-उपार्जन पोर्टल द्वारा औपचारिक भुगतान बिल (#BIL) सृजन पर' : 'e-Uparjan portal invoice generation',
@@ -250,29 +269,29 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
       step: 5,
       title: isHi ? '5. PFMS / ट्रेजरी क्लीयरेंस' : '5. PFMS Treasury',
       subDone: isHi ? 'ट्रेजरी DSC हस्ताक्षरित' : 'Treasury DSC Signed',
-      subActive: isHi ? 'वर्तमान चरण (In Transit)' : 'Current Stage (In Transit)',
+      subActive: isHi ? 'प्रशासक स्वीकृति प्रक्रियाधीन' : 'Admin Approval Processing',
       subPending: isHi ? 'ट्रेजरी बैच प्रतीक्षारत' : 'Treasury Awaited',
-      timeDone: '26 Oct, 04:20 PM',
-      timeActive: isHi ? 'ट्रेजरी अनुमोदित' : 'Treasury Approved',
+      timeDone: 'आज, 04:20 PM',
+      timeActive: isHi ? 'ट्रेजरी फाइल प्रेषित' : 'Treasury Sent',
       timePending: isHi ? 'लंबित' : 'Pending',
       trigger: isHi ? 'जिला कोषालय अधिकारी द्वारा DSC डिजिटल टोकन से भुगतान फाइल PFMS को भेजने पर' : 'District Treasury DSC digital sign to PFMS',
     },
     {
       step: 6,
       title: isHi ? '6. बैंक खाता क्रेडिट' : '6. Bank Credit',
-      subDone: isHi ? '₹1,08,000 जमा ✓' : '₹1,08,000 Credited ✓',
+      subDone: isHi ? `₹${grossTotal.toLocaleString('en-IN')} जमा ✓` : `₹${grossTotal.toLocaleString('en-IN')} Credited ✓`,
       subActive: isHi ? 'NPCI पेमेंट गेटवे क्रेडिट' : 'NPCI Credit Processing',
-      subPending: isHi ? 'आगामी (Expected ~4h)' : 'Upcoming (~4h)',
+      subPending: isHi ? 'आगामी (स्वीकृति उपरांत)' : 'Upcoming (Post Approval)',
       timeDone: isHi ? 'सफलतापूर्वक जमा' : 'Credited Successfully',
       timeActive: isHi ? 'क्रेडिट जारी...' : 'Crediting...',
-      timePending: '27 Oct, 04:00 PM',
+      timePending: 'स्वीकृति पश्चात',
       trigger: isHi ? 'NPCI आधार पेमेंट ब्रिज (APB) द्वारा किसान के बैंक खाते में सीधा अंतरण' : 'NPCI Aadhaar Payment Bridge fund transfer',
     },
   ];
 
   const steps = stageDefs.map((def) => {
-    const isDone = def.step < currentDbtStage;
-    const isActive = def.step === currentDbtStage;
+    const isDone = def.step < currentDbtStage || (def.step === 6 && currentDbtStage === 6);
+    const isActive = def.step === currentDbtStage && currentDbtStage !== 6;
     return {
       step: def.step,
       title: def.title,
@@ -492,19 +511,19 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
                     {isHi ? 'आज का कुल देय भुगतान (Total Due Today)' : 'Total Due Payment Today'}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
-                    currentDbtStage === 6
+                    liveDbtStatus === 'credit_successful' || currentDbtStage === 6
                       ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
                       : 'bg-amber-50 text-amber-800 border-amber-200'
                   }`}>
-                    {currentDbtStage === 6 ? (
+                    {liveDbtStatus === 'credit_successful' || currentDbtStage === 6 ? (
                       <>
                         <CheckCircle className="w-3 h-3 text-emerald-600" />
-                        <span>{isHi ? 'खाते में जमा पूर्ण ✓' : 'Credited to Bank ✓'}</span>
+                        <span>{isHi ? `खाते में जमा पूर्ण ✓` : `Credited to Bank ✓`}</span>
                       </>
                     ) : (
                       <>
                         <Clock className="w-3 h-3 animate-pulse" />
-                        <span>{isHi ? `चरण ${currentDbtStage}/6 गतिशील` : `Stage ${currentDbtStage}/6 Active`}</span>
+                        <span>{isHi ? 'प्रक्रियाधीन (ट्रेजरी क्लियरेंस)' : 'In Progress (Treasury Clearance)'}</span>
                       </>
                     )}
                   </span>
@@ -512,13 +531,13 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
 
                 <div className="my-2 flex items-baseline gap-1">
                   <span className="text-3xl sm:text-4xl font-black text-[#0f3d2e] tracking-tight">
-                    ₹1,08,000
+                    ₹{grossTotal.toLocaleString('en-IN')}
                   </span>
                   <span className="text-lg font-bold text-gray-500">.00</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-gray-700 font-medium mt-1">
                   <span className="text-amber-700">🌾</span>
-                  <span>{isHi ? '45 क्विंटल शरबती गेहूँ @ ₹2,400/क्विंटल' : '45 Qtl Sharbati Wheat @ ₹2,400/Qtl'}</span>
+                  <span>{isHi ? `${registeredQty} क्विंटल ${cropDisplayName} @ ₹${effectiveRate.toLocaleString('en-IN')}/क्विंटल` : `${registeredQty} Qtl ${cropDisplayName} @ ₹${effectiveRate.toLocaleString('en-IN')}/Qtl`}</span>
                 </div>
               </div>
 
@@ -560,10 +579,10 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-gray-900">
-                      SBI •••• 4812
+                      {farmer?.bankAccount ? `${farmer.bankName || 'SBI'} •••• ${farmer.bankAccount.slice(-4)}` : 'SBI •••• 4812'}
                     </h4>
                     <p className="text-[11px] text-gray-500">
-                      {isHi ? 'भारतीय स्टेट बैंक, सांवेर शाखा (IFSC: SBIN0001248)' : 'State Bank of India, Sanwer Branch (IFSC: SBIN0001248)'}
+                      {farmer?.bankName || 'भारतीय स्टेट बैंक'}, शाखा: {farmer?.village || 'सांवेर'} (IFSC: {farmer?.ifscCode || 'SBIN0001248'})
                     </p>
                   </div>
                 </div>
@@ -577,7 +596,7 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
               <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
                 <span>
                   {isHi ? 'खाताधारक:' : 'A/C Holder:'}{' '}
-                  <strong className="text-gray-800">{farmer?.nameHi || 'राम सिंह बद्रीलाल'}</strong>
+                  <strong className="text-gray-800">{farmer?.nameHi || 'रामप्रसाद पाटीदार'}</strong>
                 </span>
                 <span className="text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                   {isHi ? 'प्राथमिक DBT खाता' : 'Primary DBT A/C'}
@@ -586,142 +605,9 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
             </div>
           </div>
 
-          {/* Live PFMS & Treasury Pipeline Details Card */}
-          <div className="bg-gradient-to-r from-[#12382a] to-[#1a4a39] text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-[#1b5e40]">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3 mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300">
-                  <Clock className="w-4 h-4 animate-spin" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-white flex items-center gap-2">
-                    <span>{isHi ? 'PFMS ट्रेजरी एवं समाशोधन स्थिति' : 'PFMS Treasury & Clearing Pipeline'}</span>
-                    <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded border border-emerald-400/30">
-                      Live Gateway
-                    </span>
-                  </h4>
-                  <p className="text-[11px] text-emerald-200/80">
-                    {isHi ? 'सरकारी ट्रेजरी से अनुमोदन पश्चात बैंक समाशोधन प्रक्रिया में' : 'Approved by District Treasury; currently in RBI-NPCI Clearing House'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-left sm:text-right">
-                <span className="text-[10px] text-emerald-200 uppercase tracking-wider block">
-                  {isHi ? 'अपेक्षित क्रेडिट समय' : 'Estimated Bank Credit'}
-                </span>
-                <span className="text-sm font-extrabold text-amber-300 font-mono">
-                  ~ 3 {isHi ? 'घंटे 45 मिनट शेष' : 'hours 45 mins left'}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                <span className="text-[10.5px] text-emerald-200/70 block">{isHi ? 'PFMS स्वीकृति क्रमांक' : 'PFMS Sanction No'}</span>
-                <span className="font-mono font-bold text-white text-[11.5px]">PFMS/2025/MP/WHT-9941829</span>
-              </div>
-              <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                <span className="text-[10.5px] text-emerald-200/70 block">{isHi ? 'ट्रेजरी टोकन संख्या' : 'Treasury Token No'}</span>
-                <span className="font-mono font-bold text-white text-[11.5px]">TR-IND-88219</span>
-              </div>
-              <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                <span className="text-[10.5px] text-emerald-200/70 block">{isHi ? 'भुगतान माध्यम' : 'Payment Channel'}</span>
-                <span className="font-bold text-white text-[11.5px]">Aadhaar Payment Bridge (APB)</span>
-              </div>
-              <div className="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                <span className="text-[10.5px] text-emerald-200/70 block">{isHi ? 'एसएमएस सूचना' : 'SMS Alert Status'}</span>
-                <span className="text-emerald-300 font-bold text-[11.5px] flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  +91 98260 ••••
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* Stepper Section: DBT भुगतान चरण एवं लाइव स्थिति */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4">
-            {/* Toast Alert */}
-            {dbtToast && (
-              <div className="bg-emerald-50 border-2 border-emerald-400 text-emerald-950 p-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs animate-bounce">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>{dbtToast}</span>
-                </div>
-                <button onClick={() => setDbtToast(null)} className="text-emerald-700 hover:text-black">✕</button>
-              </div>
-            )}
-
-            {/* Real-time Pipeline Controller & Logic Explainer */}
-            <div className="bg-[#f0f7f3] border border-[#c4e2d0] rounded-xl p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-                  <h4 className="text-xs font-extrabold text-[#113a27]">
-                    {isHi ? '📡 रियल-टाइम ई-उपार्जन व PFMS लाइव इंजन' : '📡 Real-Time e-Uparjan & PFMS Live Engine'}
-                  </h4>
-                  <span className="text-[10px] font-bold bg-white text-[#1b5e20] px-2 py-0.5 rounded border border-[#b2dbbf]">
-                    {isHi ? 'ऑटो-वेरिफाइड' : 'Auto-Verified'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-[#3d6550] leading-snug">
-                  {isHi 
-                    ? 'चरण निर्धारण का आधार: तौल कांटा (चरण 1) → लैब नमी जांच (चरण 2) → गोदाम मुंशी पावती (चरण 3) → ई-उपार्जन बिल (चरण 4) → ट्रेजरी DSC (चरण 5) → बैंक APB (चरण 6)।' 
-                    : 'Decision Logic: Scale Weighment (1) → Lab Moisture (2) → Godown Receipt (3) → e-Uparjan Bill (4) → Treasury DSC (5) → Bank APB (6).'}
-                </p>
-              </div>
-
-              {/* Action Buttons to Advance and Test Real-Time Live Progression */}
-              <div className="flex items-center gap-2 flex-wrap shrink-0">
-                <button
-                  onClick={advanceStage}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1b4d3e] hover:bg-black text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                  title={isHi ? 'अगले चरण पर लाइव आगे बढ़ें' : 'Advance to next lifecycle step'}
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>{isHi ? '▶️ अगला चरण प्रोसेस करें' : '▶️ Process Next Stage'}</span>
-                </button>
-
-                <button
-                  onClick={() => setAutoProgress(!autoProgress)}
-                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                    autoProgress 
-                      ? 'bg-amber-100 text-amber-900 border-amber-300' 
-                      : 'bg-white text-[#1e4a36] border-[#bad7c5] hover:bg-gray-50'
-                  }`}
-                  title={isHi ? 'हर 4 सेकंड में स्वचालित आगे बढ़ाएं' : 'Auto-progress every 4 seconds'}
-                >
-                  {autoProgress ? <Pause className="w-3 h-3" /> : <FastForward className="w-3 h-3" />}
-                  <span>{autoProgress ? (isHi ? '⏸️ ऑटो-सिंक जारी' : '⏸️ Auto-Sync On') : (isHi ? '⚡ ऑटो-सिंक (Live)' : '⚡ Auto-Sync (Live)')}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Jumper Step Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
-              <span className="text-[#4e7460] font-bold shrink-0">{isHi ? 'त्वरित चरण जम्प:' : 'Jump Step:'}</span>
-              {[1, 2, 3, 4, 5, 6].map((sNum) => {
-                const isSelected = currentDbtStage === sNum;
-                const labels = isHi 
-                  ? ['१. तौल', '२. लैब नमी', '३. गोदाम W/R', '४. बिल', '५. PFMS ट्रेजरी', '६. बैंक क्रेडिट']
-                  : ['1. Weigh', '2. Lab', '3. Godown', '4. Bill', '5. PFMS', '6. Bank Credit'];
-                return (
-                  <button
-                    key={sNum}
-                    onClick={() => jumpToStage(sNum)}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer shrink-0 border ${
-                      isSelected
-                        ? 'bg-[#1b4d3e] text-white border-[#143e31] shadow-2xs'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                    }`}
-                  >
-                    {labels[sNum - 1]}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h3 className="text-base font-bold text-gray-900">
                   {isHi ? 'DBT भुगतान चरण एवं लाइव स्थिति' : 'DBT Payment Lifecycle Tracker'}
@@ -731,15 +617,15 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
                 </p>
               </div>
               <span className={`text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 border ${
-                currentDbtStage === 6 
+                liveDbtStatus === 'credit_successful' || currentDbtStage === 6
                   ? 'bg-emerald-100 text-emerald-900 border-emerald-300' 
                   : 'text-amber-900 bg-amber-50 border-amber-200'
               }`}>
-                <span className={`w-2 h-2 rounded-full ${currentDbtStage === 6 ? 'bg-emerald-600' : 'bg-amber-600 animate-ping'}`}></span>
+                <span className={`w-2 h-2 rounded-full ${liveDbtStatus === 'credit_successful' || currentDbtStage === 6 ? 'bg-emerald-600' : 'bg-amber-600 animate-ping'}`}></span>
                 <span>
-                  {currentDbtStage === 6 
-                    ? (isHi ? 'चरण 6/6: बैंक खाते में जमा पूर्ण ✓' : 'Step 6/6: Credited to Bank ✓') 
-                    : (isHi ? `चरण ${currentDbtStage}/6 गतिशील` : `Step ${currentDbtStage}/6 Active`)}
+                  {liveDbtStatus === 'credit_successful' || currentDbtStage === 6 
+                    ? (isHi ? `चरण 6/6: बैंक खाते में जमा पूर्ण ✓ (UTR: ${liveUtr || farmer?.dbtUtrNumber || 'SBIN882194821'})` : `Step 6/6: Credited to Bank ✓ (UTR: ${liveUtr || farmer?.dbtUtrNumber || 'SBIN882194821'})`) 
+                    : (isHi ? `चरण 5/6: प्रशासक स्वीकृति प्रक्रियाधीन` : `Step 5/6: Admin Approval Processing`)}
                 </span>
               </span>
             </div>
@@ -820,27 +706,27 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
               <div className="flex items-center justify-between py-1">
                 <span>
                   {isHi 
-                    ? 'केंद्रीय न्यूनतम समर्थन मूल्य (₹2,275 प्रति क्विंटल × 45.00 क्विंटल)' 
-                    : 'Central MSP Share (₹2,275 per Qtl × 45.00 Qtl)'}
+                    ? `केंद्रीय न्यूनतम समर्थन मूल्य (₹${unitMsp.toLocaleString('en-IN')} प्रति क्विंटल × ${registeredQty}.00 क्विंटल)` 
+                    : `Central MSP Share (₹${unitMsp.toLocaleString('en-IN')} per Qtl × ${registeredQty}.00 Qtl)`}
                 </span>
-                <span className="font-mono font-bold text-gray-900">₹1,02,375.00</span>
+                <span className="font-mono font-bold text-gray-900">₹{centralMspTotal.toLocaleString('en-IN')}.00</span>
               </div>
 
               {/* Row 2 */}
               <div className="flex items-center justify-between py-1">
                 <span className="flex items-center gap-1.5">
-                  <span>{isHi ? 'मध्य प्रदेश राज्य बोनस (₹125 प्रति क्विंटल)' : 'MP State Procurement Bonus (₹125/Qtl)'}</span>
+                  <span>{isHi ? `मध्य प्रदेश राज्य बोनस (₹${unitBonus} प्रति क्विंटल)` : `MP State Procurement Bonus (₹${unitBonus}/Qtl)`}</span>
                   <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
                     MP Govt
                   </span>
                 </span>
-                <span className="font-mono font-bold text-emerald-800">+ ₹5,625.00</span>
+                <span className="font-mono font-bold text-emerald-800">+ ₹{stateBonusTotal.toLocaleString('en-IN')}.00</span>
               </div>
 
               {/* Row 3 - Gross Subtotal */}
               <div className="flex items-center justify-between bg-gray-50 p-2.5 rounded-lg font-bold text-gray-900">
                 <span>{isHi ? 'सकल उपार्जन राशि (Gross Procurement Amount)' : 'Gross Procurement Subtotal'}</span>
-                <span className="font-mono text-sm">₹1,08,000.00</span>
+                <span className="font-mono text-sm">₹{grossTotal.toLocaleString('en-IN')}.00</span>
               </div>
 
               {/* Row 4 */}
@@ -863,14 +749,12 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
                       {isHi ? 'कुल शुद्ध अंतरण राशि (Net DBT Credit)' : 'Net Amount to be Credited via DBT'}
                     </span>
                     <span className="text-2xl sm:text-3xl font-black text-[#1b5e20] font-mono">
-                      ₹1,08,000.00
+                      ₹{grossTotal.toLocaleString('en-IN')}.00
                     </span>
                   </div>
                   <div className="flex flex-col items-start sm:items-end gap-1">
                     <span className="text-xs text-gray-600 font-medium bg-white px-3 py-1.5 rounded-lg border border-emerald-200 shadow-2xs">
-                      {isHi 
-                        ? 'एक लाख आठ हज़ार रुपये केवल (One Lakh Eight Thousand Rupees Only)' 
-                        : 'One Lakh Eight Thousand Rupees Only'}
+                      {getAmountInWords(grossTotal, isHi)}
                     </span>
                     <span className="text-[10px] text-emerald-700 font-bold">
                       ✓ {isHi ? 'सीधे किसान के बैंक खाते में DBT द्वारा' : 'Direct credit to farmer bank account via PFMS'}
@@ -1364,13 +1248,13 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
               <div className="grid grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-gray-200">
                 <div>
                   <span className="text-[10px] text-gray-500 block">{isHi ? 'किसान का नाम' : 'Farmer Name'}</span>
-                  <strong className="text-gray-900">{farmer?.nameHi || 'राम सिंह बद्रीलाल'}</strong>
-                  <div className="text-[10px] text-gray-500 font-mono">ID: MP-88210 | समग्र: 108821941</div>
+                  <strong className="text-gray-900">{farmer?.nameHi || 'रामप्रसाद पाटीदार'}</strong>
+                  <div className="text-[10px] text-gray-500 font-mono">ID: {farmer?.id || 'MP-88210'} | समग्र: {farmer?.samagraId || '108821941'}</div>
                 </div>
                 <div>
                   <span className="text-[10px] text-gray-500 block">{isHi ? 'सत्यापित बैंक खाता' : 'Bank Account'}</span>
-                  <strong className="text-gray-900">State Bank of India</strong>
-                  <div className="text-[10px] text-gray-500 font-mono">A/C: •••• 4812 (IFSC: SBIN0001248)</div>
+                  <strong className="text-gray-900">{farmer?.bankName || 'State Bank of India'}</strong>
+                  <div className="text-[10px] text-gray-500 font-mono">A/C: {farmer?.bankAccount ? `•••• ${farmer.bankAccount.slice(-4)}` : '•••• 4812'} (IFSC: {farmer?.ifscCode || 'SBIN0001248'})</div>
                 </div>
               </div>
 
@@ -1378,15 +1262,15 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
               <div className="grid grid-cols-3 gap-2 text-center bg-white p-2.5 rounded-lg border border-gray-200">
                 <div>
                   <span className="text-[10px] text-gray-500 block">{isHi ? 'उपार्जित फसल' : 'Crop'}</span>
-                  <span className="font-bold text-gray-900">शरबती गेहूँ (FAQ)</span>
+                  <span className="font-bold text-gray-900">{cropDisplayName}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-gray-500 block">{isHi ? 'स्वीकृत वजन' : 'Weight'}</span>
-                  <span className="font-bold text-gray-900">45.00 क्विंटल</span>
+                  <span className="font-bold text-gray-900">{registeredQty}.00 क्विंटल</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-gray-500 block">{isHi ? 'कुल दर (MSP+बोनस)' : 'Rate'}</span>
-                  <span className="font-bold text-gray-900">₹2,400 / Qtl</span>
+                  <span className="font-bold text-gray-900">₹{effectiveRate.toLocaleString('en-IN')} / Qtl</span>
                 </div>
               </div>
 
@@ -1395,15 +1279,15 @@ export const DbtPaymentView: React.FC<DbtPaymentViewProps> = ({
                 <div>
                   <span className="text-[10px] font-bold text-gray-600 block">कुल अंतरित राशि (Net Amount)</span>
                   <span className="text-2xl font-black text-[#1b5e20] font-mono">
-                    ₹1,08,000.00
+                    ₹{grossTotal.toLocaleString('en-IN')}.00
                   </span>
                 </div>
                 <div className="text-right">
                   <div className="text-[10.5px] font-bold text-gray-700">
-                    एक लाख आठ हज़ार रुपये केवल
+                    {getAmountInWords(grossTotal, isHi)}
                   </div>
                   <div className="text-[9.5px] text-emerald-800">
-                    Direct Credit to Bank A/C ending 4812
+                    Direct Credit to Bank A/C ending {farmer?.bankAccount ? farmer.bankAccount.slice(-4) : '4812'}
                   </div>
                 </div>
               </div>

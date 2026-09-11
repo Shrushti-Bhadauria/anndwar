@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import { db } from '../db.js';
+import { db, getActiveSlot as getActiveSlotFromDb } from '../db.js';
 
 // Get active confirmed slot
 export const getActiveSlot = async (req: Request, res: Response) => {
   try {
-    const slot = (await db.slots.findOne({ status: 'arrived' })) || (await db.slots.findOne());
+    const slot = await getActiveSlotFromDb();
     res.json(slot);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
