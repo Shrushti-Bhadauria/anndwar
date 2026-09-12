@@ -1,16 +1,23 @@
+// import 'dotenv/config';
+// import express from 'express';
+// import path from 'path';
+// // import { fileURLToPath } from 'url';
+// import { createServer as createViteServer } from 'vite';
+// import apiRouter from './server/routes/index.js';
+
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import apiRouter from './server/routes/index.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3080;
+ 
 
   app.use(express.json({ limit: '20mb' }));
 
@@ -32,9 +39,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌾 Anndwar Server running on http://localhost:${PORT}`);
-  });
+  app.listen(Number(process.env.PORT) || 3000, '0.0.0.0', () => {
+  console.log(`Server running on http://localhost:${process.env.PORT || 3000}`);
+});
 }
 
 startServer();
